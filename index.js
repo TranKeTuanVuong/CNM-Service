@@ -6,7 +6,6 @@ const bcrypt = require("bcrypt");
 const app = express();
 const userRoutes = require("./routers/UserRouter");
 
-
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -22,10 +21,9 @@ mongoose
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
-  
+
 
   app.use("/api", userRoutes);
-
 
   // Chạy server
 const PORT = process.env.PORT || 5000;
