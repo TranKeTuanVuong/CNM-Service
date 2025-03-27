@@ -117,6 +117,26 @@ router.post("/users/doimatkhau", async (req, res) => {
       res.json(updatedUser);
     }
   } catch (error) {
+
+
+// API doi mat khau
+router.post("/users/doimatkhau", async (req, res) => {
+  try {
+    console.log("Request body:", req.body); // Debug dữ liệu nhận và
+    console.log("SDT:", req.body.SDT);
+    console.log("Mật khẩu mới:", req.body.matkhau);
+    const updatedUser = await Users.findOneAndUpdate(
+      { SDT: req.body.SDT },
+      { $set: { matkhau: req.body.matkhau } },
+      { new: true, runValidators: true }
+    );
+    
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User không tồn tại" });
+    }else{
+      res.json(updatedUser);
+    }
+  } catch (error) {
     console.error("Lỗi:", error.message);
     res.status(500).json({ error: error.message });
   }
