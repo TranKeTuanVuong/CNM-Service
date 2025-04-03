@@ -16,10 +16,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "firebase-admin": "^13.2.0",
-<<<<<<< HEAD
     "jsonwebtoken": "^9.0.2",
-=======
->>>>>>> 636fd49 (update)
     "mongoose": "^8.12.1"
   }
 }

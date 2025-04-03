@@ -39,7 +39,7 @@ router.post ("/login", async (req, res) => {
       console.log("Mật khẩu trong db:", user.matKhau);
       const isMatch = await bcrypt.compare(matKhau, user.matKhau);
       console.log("✅ Kết quả kiểm tra mật khẩu:", isMatch);
-
+      console.log(user.anhDaiDien);
       if (!isMatch) {
           console.log("❌ Mật khẩu không đúng!");
           return res.status(400).json({ message: "Sai số điện thoại hoặc mật khẩu!" });
@@ -50,13 +50,7 @@ router.post ("/login", async (req, res) => {
 
       res.status(200).json({
           message: "Đăng nhập thành công!",
-          
-          user: {
-              _id: user._id,
-              name: user.name,
-              sdt: user.sdt,
-              trangThai: user.trangThai,
-          },
+          user
       });
   } catch (error) {
       console.log("🔥 Lỗi server:", error);
@@ -102,32 +96,12 @@ router.post("/registerUser",async (req, res) => {
 // API doi mat khau
 router.post("/users/doimatkhau", async (req, res) => {
   try {
-    console.log("Request body:", req.body); // Debug dữ liệu nhận và
-    console.log("SDT:", req.body.SDT);
-    console.log("Mật khẩu mới:", req.body.matkhau);
+    const { sdt, matKhau } = req.body;
+    const salt = await bcrypt.genSalt(10);
+    const mk = await bcrypt.hash(matKhau, salt);
     const updatedUser = await Users.findOneAndUpdate(
-      { SDT: req.body.SDT },
-      { $set: { matkhau: req.body.matkhau } },
-      { new: true, runValidators: true }
-    );
-    
-    if (!updatedUser) {
-      return res.status(404).json({ message: "User không tồn tại" });
-    }else{
-      res.json(updatedUser);
-    }
-  } catch (error) {
-
-
-// API doi mat khau
-router.post("/users/doimatkhau", async (req, res) => {
-  try {
-    console.log("Request body:", req.body); // Debug dữ liệu nhận và
-    console.log("SDT:", req.body.SDT);
-    console.log("Mật khẩu mới:", req.body.matkhau);
-    const updatedUser = await Users.findOneAndUpdate(
-      { SDT: req.body.SDT },
-      { $set: { matkhau: req.body.matkhau } },
+      { sdt:sdt },
+      { $set: { matKhau:mk}},
       { new: true, runValidators: true }
     );
     
@@ -141,5 +115,22 @@ router.post("/users/doimatkhau", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+
+// API lấy user theo email
+router.post("/users/email", async (req, res) => {
+  try {
+    const { email } = req.body;
+    console.log("Email:", email); // Log email nhận được
+    
+    const userExists = await Users.exists({ email: email }); // Kiểm tra sự tồn tại
+
+    res.json({ exists: !!userExists }); // Trả về true nếu tồn tại, false nếu không
+  } catch (error) {
+    console.error("Lỗi:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 module.exports = router;
