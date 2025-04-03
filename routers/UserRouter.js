@@ -2,7 +2,7 @@ const express = require("express");
 const Users = require("../models/User");
 const router = express.Router();
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 // API lấy danh sách user
 router.get("/users", async (req, res) => {
   try {
