@@ -13,16 +13,6 @@ router.get("/users", async (req, res) => {
   }
 });
 
-// API lấy chi tiết user theo userID
-// router.get("/users/:userID", async (req, res) => {
-//   try {
-//     const user = await Users.findOne({ userID: req.params.userID });
-//     if (!user) return res.status(404).json({ message: "User không tồn tại" });
-//     res.json(user);
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
 router.post ("/login", async (req, res) => {
   const { sdt, matKhau } = req.body;
   console.log("📌 Đăng nhập với số:", sdt); // Log số điện thoại
@@ -57,11 +47,28 @@ router.post ("/login", async (req, res) => {
       res.status(500).json({ message: error.message });
   }
 });
+const generateUserID = async () => {
+  // Tìm người dùng cuối cùng để lấy ID lớn nhất
+  const lastUser = await Users.findOne().sort({ userID: -1 }).limit(1);
 
+  // Nếu không có người dùng nào, bắt đầu từ user001
+  if (!lastUser) {
+    return 'user001';
+  }
+
+  // Lấy số ID của người dùng cuối cùng, tăng 1 và tạo userID mới
+  const lastUserID = lastUser.userID;
+  const lastNumber = parseInt(lastUserID.replace('user', ''), 10);  // Tách phần số từ userID
+  const newNumber = lastNumber + 1;  // Tăng số lên 1
+
+  // Đảm bảo rằng userID có 3 chữ số
+  return `user${newNumber.toString().padStart(3, '0')}`;
+};
+// API đăng ký người dùng
 router.post("/registerUser",async (req, res) => {
-  const { sdt, name, ngaySinh, matKhau } = req.body;
+  const { sdt, name, ngaySinh, matKhau,email} = req.body;
 
-  if (!sdt || !name || !ngaySinh || !matKhau) {
+  if (!sdt || !name || !ngaySinh || !matKhau || !email) {
       return res.status(400).json({ message: "Vui lòng điền đầy đủ thông tin" });
   }
 
@@ -74,13 +81,18 @@ router.post("/registerUser",async (req, res) => {
   // Mã hóa mật khẩu
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(matKhau, salt);
-
+  
+  const userid = await generateUserID(); // Tạo userID mới
+  console.log("📌 userID mới:", userid); // Log userID mới
   // Tạo người dùng mới
   const user = await Users.create({
-      sdt,
-      name,
-      ngaySinh,
+      userID: userid,
+      sdt: sdt,
+      name: name,
+      ngaySinh: ngaySinh,
       matKhau: hashedPassword, // Lưu mật khẩu đã mã hóa
+      email: email,
+      trangThai: "offline"
   });
 
   if (user) {
@@ -110,6 +122,21 @@ router.post("/users/doimatkhau", async (req, res) => {
     }else{
       res.json(updatedUser);
     }
+  } catch (error) {
+    console.error("Lỗi:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+// API lấy user theo email
+router.post("/users/checksdt", async (req, res) => {
+  try {
+    const {sdt } = req.body;
+    
+    console.log("Sdt:", sdt); // Log email nhận được
+    
+    const userExists = await Users.exists({sdt:sdt}); // Kiểm tra sự tồn tại
+
+    res.json({ exists: !!userExists }); // Trả về true nếu tồn tại, false nếu không
   } catch (error) {
     console.error("Lỗi:", error.message);
     res.status(500).json({ error: error.message });

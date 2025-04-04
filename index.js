@@ -6,7 +6,7 @@ const app = express();
 const userRoutes = require("./routers/UserRouter");
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
 app.use(express.json());
 
 // Kết nối MongoDB
