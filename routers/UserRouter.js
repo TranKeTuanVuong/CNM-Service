@@ -3,6 +3,7 @@ const Users = require("../models/User");
 const router = express.Router();
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const Controller = require("../controller/index");
 // API lấy danh sách user
 router.get("/users", async (req, res) => {
   try {
@@ -156,6 +157,18 @@ router.post("/users/email", async (req, res) => {
   } catch (error) {
     console.error("Lỗi:", error.message);
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/send-otp', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: 'Thiếu địa chỉ email' });
+  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Tạo OTP ngẫu nhiên
+  try {
+    await Controller.sendOtpEmail(email, otp);
+    res.status(200).json({ message: 'Gửi OTP thành công', otp }); // ⚠️ Không nên trả về OTP ở production
+  } catch (error) {
+    res.status(500).json({ message: 'Gửi OTP thất bại', error: error.message });
   }
 });
 
