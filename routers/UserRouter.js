@@ -67,7 +67,7 @@ const generateUserID = async () => {
 };
 // API đăng ký người dùng
 router.post("/registerUser",async (req, res) => {
-  const { sdt, name, ngaySinh, matKhau,email} = req.body;
+  const { sdt, name, ngaySinh, matKhau,email,gioTinh} = req.body;
 
   if (!sdt || !name || !ngaySinh || !matKhau || !email) {
       return res.status(400).json({ message: "Vui lòng điền đầy đủ thông tin" });
@@ -93,6 +93,7 @@ router.post("/registerUser",async (req, res) => {
       ngaySinh: ngaySinh,
       matKhau: hashedPassword, // Lưu mật khẩu đã mã hóa
       email: email,
+      gioTinh: gioTinh,
       trangThai: "offline"
   });
 
