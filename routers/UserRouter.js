@@ -119,9 +119,9 @@ router.post("/users/doimatkhau", async (req, res) => {
     );
     
     if (!updatedUser) {
-      return res.status(404).json({ message: "User không tồn tại" });
-    }else{
-      res.json(updatedUser);
+      return res.status(404).json({ success: false, message: "User không tồn tại" });
+    } else {
+      return res.status(200).json({ success: true, user: updatedUser });
     }
   } catch (error) {
     console.error("Lỗi:", error.message);
