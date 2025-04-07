@@ -87,14 +87,14 @@ router.post("/registerUser",async (req, res) => {
   console.log("📌 userID mới:", userid); // Log userID mới
   // Tạo người dùng mới
   const user = await Users.create({
-      userID: userid,
-      sdt: sdt,
       name: name,
+      userID: userid, 
+      email: email, 
+      trangThai: "offline",
       ngaySinh: ngaySinh,
-      matKhau: hashedPassword, // Lưu mật khẩu đã mã hóa
-      email: email,
       gioTinh: gioTinh,
-      trangThai: "offline"
+      sdt: sdt,
+      matKhau: hashedPassword, // Lưu mật khẩu đã mã hóa
   });
 
   if (user) {
