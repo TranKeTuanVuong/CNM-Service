@@ -12,7 +12,7 @@ const UserSchema = new mongoose.Schema({
     ngaySuaDoi: { type: Date, default: Date.now },
     ngaysinh: { type: Date },
     anhBia: { type: String },
-    gioiTinh: { type: String, enum: ["Nam", "Nữ", "Khác"] },
+    gioTinh: { type: String, enum: ["Nam", "Nữ", "Khác"] },
   });
   
   const Users = mongoose.model("Users", UserSchema,"Users");

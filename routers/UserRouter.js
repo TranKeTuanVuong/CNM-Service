@@ -90,8 +90,9 @@ router.post("/registerUser",async (req, res) => {
       name: name,
       userID: userid, 
       email: email, 
+      ngaysinh:"https://res.cloudinary.com/dgqppqcbd/image/upload/v1741595806/anh-dai-…",
       trangThai: "offline",
-      ngaySinh: ngaySinh,
+      ngaysinh: ngaySinh,
       gioTinh: gioTinh,
       sdt: sdt,
       matKhau: hashedPassword, // Lưu mật khẩu đã mã hóa
