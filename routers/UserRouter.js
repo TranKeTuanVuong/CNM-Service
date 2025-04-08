@@ -90,9 +90,10 @@ router.post("/registerUser",async (req, res) => {
       name: name,
       userID: userid, 
       email: email, 
-      ngaysinh:"https://res.cloudinary.com/dgqppqcbd/image/upload/v1741595806/anh-dai-…",
+      anhDaiDien:"https://res.cloudinary.com/dgqppqcbd/image/upload/v1741595806/anh-dai-…",
       trangThai: "offline",
       ngaysinh: ngaySinh,
+      anhBia:"https://res.cloudinary.com/dgqppqcbd/image/upload/v1741595806/anh-dai-…",
       gioTinh: gioTinh,
       sdt: sdt,
       matKhau: hashedPassword, // Lưu mật khẩu đã mã hóa
@@ -168,7 +169,7 @@ router.post('/send-otp', async (req, res) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Tạo OTP ngẫu nhiên
   try {
     await Controller.sendOtpEmail(email, otp);
-    res.status(200).json({ message: 'Gửi OTP thành công', otp }); // ⚠️ Không nên trả về OTP ở production
+    res.status(200).json({ message: 'Gửi OTP thành công', otp });
   } catch (error) {
     res.status(500).json({ message: 'Gửi OTP thất bại', error: error.message });
   }
