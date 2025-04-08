@@ -175,5 +175,58 @@ router.post('/send-otp', async (req, res) => {
   }
 });
 
+// Cập nhật thông tin người dùng
+router.put("/update-user", async (req, res) => {
+  const { userID, name, email, sdt, dob, gender, avatar, anhBia, matKhau } = req.body;
+
+  // Kiểm tra các trường bắt buộc
+  if (!userID || !name || !email || !sdt) {
+    return res.status(400).json({ message: "Thiếu thông tin cần thiết!" });
+  }
+
+  try {
+    // Tìm người dùng trong cơ sở dữ liệu
+    const user = await Users.findOne({ userID });
+
+    // Nếu người dùng không tồn tại
+    if (!user) {
+      return res.status(404).json({ message: "Người dùng không tồn tại!" });
+    }
+
+    // Cập nhật thông tin người dùng
+    user.name = name || user.name;
+    user.email = email || user.email;
+    user.sdt = sdt || user.sdt;
+    
+    // Chuyển đổi ngày sinh thành Date hợp lệ (chuyển từ 'dd-MM-yyyy' sang 'yyyy-MM-dd')
+    if (dob) {
+      const dateParts = dob.split("-");
+      const validDob = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`); // Chuyển đổi thành yyyy-MM-dd
+      if (isNaN(validDob)) {
+        return res.status(400).json({ message: "Ngày sinh không hợp lệ!" });
+      }
+      user.ngaysinh = validDob;
+    }
+
+    user.gioiTinh = gender || user.gioiTinh;
+    user.anhDaiDien = avatar || user.anhDaiDien;
+    user.anhBia = anhBia || user.anhBia;
+    user.matKhau = matKhau || user.matKhau;
+
+    // Cập nhật thời gian sửa đổi
+    user.ngaySuaDoi = Date.now();
+
+    // Lưu lại người dùng đã được cập nhật
+    await user.save();
+
+    // Trả về phản hồi thành công
+    res.status(200).json({ message: "Cập nhật thông tin thành công!", user });
+  } catch (err) {
+    console.error("Lỗi khi cập nhật người dùng:", err.message);
+    res.status(500).json({ message: "Lỗi hệ thống", error: err.message });
+  }
+});
+
+
 
 module.exports = router;
