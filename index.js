@@ -52,6 +52,30 @@ io.on('connection', (socket) => {
     // Gửi lại cho tất cả trong phòng (trừ người gửi cũng được nếu muốn)
     io.to(data.chatID).emit(data.chatID, data); 
   });
+  // Khi nhận tin → gửi lại cho phòng
+socket.on('send_message', (data) => {
+  io.to(data.chatID).emit(data.chatID, {
+    ...data,
+    status: 'sent'
+  });
+
+  // Giả lập người nhận đã "delivered" sau 1s
+  setTimeout(() => {
+    io.to(data.chatID).emit(`status_update_${data.chatID}`, {
+      messageID: data.tempID, // hoặc _id nếu có DB
+      status: 'delivered',
+    });
+  }, 1000);
+});
+
+// Người dùng mở phòng → báo "read"
+socket.on('read_messages', ({ chatID, userID }) => {
+  io.to(chatID).emit(`status_update_${chatID}`, {
+    userID,
+    status: 'read',
+  });
+});
+
 
   // Khi client ngắt kết nối
   socket.on('disconnect', () => {
