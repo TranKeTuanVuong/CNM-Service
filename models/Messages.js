@@ -8,7 +8,7 @@
       content: { type: String},
       type: { type: String, enum: ["text", "image", "video"], default: "text" },
       timestamp: { type: Date, default: Date.now },
-      media_url: { type: String},
+      media_url: { type: [String],default:[]},
       status: { type: String, enum: ['sent', 'delivered', 'read'], default: 'sent'},
     },{
       versionKey: false 
