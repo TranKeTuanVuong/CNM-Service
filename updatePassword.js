@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
-const User = require("./models/userModel");
+const User = require("./models/User");
 
 mongoose.connect("mongodb://localhost:27017/CNM")
     .then(() => console.log("Kết nối MongoDB thành công!"))

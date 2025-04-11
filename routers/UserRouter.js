@@ -16,40 +16,48 @@ router.get("/users", async (req, res) => {
   }
 });
 
-router.post ("/login", async (req, res) => {
+router.post("/login", async (req, res) => {
   const { sdt, matKhau } = req.body;
   console.log("📌 Đăng nhập với số:", sdt); // Log số điện thoại
 
   try {
-      const user = await Users.findOne({ sdt});
-      if (!user) {
-          console.log("❌ Không tìm thấy tài khoản!");
-          return res.status(400).json({ message: "Sai số điện thoại hoặc mật khẩu!" });
-      }
+    // Tìm người dùng trong cơ sở dữ liệu
+    const user = await Users.findOne({ sdt });
 
-      console.log("🔐 Kiểm tra mật khẩu...");
-      console.log("Mật khẩu:", matKhau);
-      console.log("Mật khẩu trong db:", user.matKhau);
-      const isMatch = await bcrypt.compare(matKhau, user.matKhau);
-      console.log("✅ Kết quả kiểm tra mật khẩu:", isMatch);
-      console.log(user.anhDaiDien);
-      if (!isMatch) {
-          console.log("❌ Mật khẩu không đúng!");
-          return res.status(400).json({ message: "Sai số điện thoại hoặc mật khẩu!" });
-      }
+    // Nếu người dùng không tồn tại
+    if (!user) {
+      console.log("❌ Không tìm thấy tài khoản!");
+      return res.status(400).json({ message: "Sai số điện thoại hoặc mật khẩu!" });
+    }
 
-    //  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-     // console.log("🎉 Đăng nhập thành công!");
+    // Kiểm tra mật khẩu
+    console.log("🔐 Kiểm tra mật khẩu...");
+    console.log("Mật khẩu:", matKhau);
+    console.log("Mật khẩu trong db:", user.matKhau);
 
-      res.status(200).json({
-          message: "Đăng nhập thành công!",
-          user
-      });
+    // So sánh mật khẩu người dùng nhập vào với mật khẩu đã mã hóa trong cơ sở dữ liệu
+    const isMatch = await bcrypt.compare(matKhau, user.matKhau); // So sánh mật khẩu đã mã hóa
+
+    console.log("✅ Kết quả kiểm tra mật khẩu:", isMatch);
+
+    if (!isMatch) {
+      console.log("❌ Mật khẩu không đúng!");
+      return res.status(400).json({ message: "Sai số điện thoại hoặc mật khẩu!" });
+    }
+
+    // Nếu mật khẩu đúng, trả về thông tin người dùng
+    res.status(200).json({
+      message: "Đăng nhập thành công!",
+      user
+    });
+
   } catch (error) {
-      console.log("🔥 Lỗi server:", error);
-      res.status(500).json({ message: error.message });
+    console.log("🔥 Lỗi server:", error);
+    res.status(500).json({ message: error.message });
   }
 });
+
+
 const generateUserID = async () => {
   // Tìm người dùng cuối cùng để lấy ID lớn nhất
   const lastUser = await Users.findOne().sort({ userID: -1 }).limit(1);
@@ -199,21 +207,32 @@ router.put("/update-user", async (req, res) => {
     user.name = name || user.name;
     user.email = email || user.email;
     user.sdt = sdt || user.sdt;
-    
-    // Chuyển đổi ngày sinh thành Date hợp lệ (chuyển từ 'dd-MM-yyyy' sang 'yyyy-MM-dd')
+
+    // Chuyển đổi ngày sinh từ dd/mm/yyyy thành Date hợp lệ
     if (dob) {
-      const dateParts = dob.split("-");
-      const validDob = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`); // Chuyển đổi thành yyyy-MM-dd
+      const dateParts = dob.split("/"); // dd/mm/yyyy
+      const validDob = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`); // chuyển thành yyyy-mm-dd
       if (isNaN(validDob)) {
         return res.status(400).json({ message: "Ngày sinh không hợp lệ!" });
       }
       user.ngaysinh = validDob;
     }
 
-    user.gioiTinh = gender || user.gioiTinh;
+    // Kiểm tra và cập nhật giới tính nếu hợp lệ
+    if (gender && ["Nam", "Nữ", "Khác"].includes(gender)) {
+      user.gioiTinh = gender || user.gioiTinh;
+    } else if (gender) {
+      return res.status(400).json({ message: "Giới tính không hợp lệ!" });
+    }
+
     user.anhDaiDien = avatar || user.anhDaiDien;
     user.anhBia = anhBia || user.anhBia;
-    user.matKhau = matKhau || user.matKhau;
+
+    // Nếu mật khẩu mới được cung cấp, mã hóa mật khẩu mới
+    if (matKhau) {
+      const hashedPassword = await bcrypt.hash(matKhau, 10); // Mã hóa mật khẩu mới
+      user.matKhau = hashedPassword;
+    }
 
     // Cập nhật thời gian sửa đổi
     user.ngaySuaDoi = Date.now();
@@ -229,6 +248,7 @@ router.put("/update-user", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 router.post("/upload", upload.array("image",5), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -250,4 +270,6 @@ router.post("/upload", upload.array("image",5), async (req, res) => {
 
 
 
+=======
+>>>>>>> f2ff093b3a264b560d29d56714dd9a9cd2440b9e
 module.exports = router;
