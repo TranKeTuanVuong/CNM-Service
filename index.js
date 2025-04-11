@@ -40,10 +40,17 @@ io.on('connection', (socket) => {
   console.log('🟢 Client connected:', socket.id);
 
   // Lắng nghe sự kiện gửi tin nhắn từ client
+  socket.on('join_chat', (chatID) => {
+    socket.join(chatID);
+    console.log(`🔁 Socket ${socket.id} joined room ${chatID}`);
+  });
+
+  // Khi có người gửi tin nhắn
   socket.on('send_message', (data) => {
-    console.log('📩 Tin nhắn nhận được:', data);
-    // Phát lại tin nhắn cho tất cả client
-    io.emit('receive_message', data);
+    console.log(`📨 New message to chat ${data.chatID}`, data);
+
+    // Gửi lại cho tất cả trong phòng (trừ người gửi cũng được nếu muốn)
+    io.to(data.chatID).emit(data.chatID, data); 
   });
 
   // Khi client ngắt kết nối
