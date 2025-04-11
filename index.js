@@ -9,6 +9,7 @@ const userRoutes = require("./routers/UserRouter");
 const chatRoutes = require("./routers/ChatRouter");
 const MessagesRoutes = require("./routers/MessageRouter");
 const chatMembersRoutes = require("./routers/ChatMembersRouter");
+const ContactsRoutes = require("./routers/ContactsRouter");
 
 
 const server = http.createServer(app);
@@ -56,6 +57,7 @@ io.on('connection', (socket) => {
   app.use("/api", chatRoutes);
   app.use("/api", MessagesRoutes);
   app.use("/api", chatMembersRoutes);
+  app.use("/api", ContactsRoutes);
   // Chạy server
 const PORT = process.env.PORT || 5000;
 const PORTSOCKET = process.env.PORTSEVER || 3000;
