@@ -248,7 +248,6 @@ router.put("/update-user", async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 router.post("/upload", upload.array("image",5), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -267,9 +266,4 @@ router.post("/upload", upload.array("image",5), async (req, res) => {
     res.status(500).json({ error: "Upload failed" });
   }
 });
-
-
-
-=======
->>>>>>> f2ff093b3a264b560d29d56714dd9a9cd2440b9e
 module.exports = router;
