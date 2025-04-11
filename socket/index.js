@@ -66,7 +66,7 @@ const socketHandler = (io) => {
 
     socket.on("getChat", async (userID) => {
         try{
-            const chats = await Controller.getChatByUserID(userID);
+            const chats = await Controller.getChatsForUser(userID);
             socket.emit("ChatByUserID", chats);
         }catch(error){
             console.error("❌ Error saving message:", error);
