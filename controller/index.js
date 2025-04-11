@@ -100,6 +100,16 @@ Controller.getCreatMessageByChatID = async (newMsg)=>{
     throw error;
   }
 };
-
+Controller.getChatMembersByChatID = async (chatID) => {
+  try {
+    const chatmembers = await ChatMembers.findOne({chatID: chatID });
+    if (!chatmembers) {
+        return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện!" });
+    }
+    return chatmembers;
+} catch (error) {
+    res.status(500).json({ error: error.message });
+}
+};
 
 module.exports = Controller;

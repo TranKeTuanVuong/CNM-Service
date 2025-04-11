@@ -1,5 +1,6 @@
 const messages = require("../models/Messages");
 const Controller = require("../controller/index");
+const ChatMembers = require("../models/ChatMember");
 
 const socketHandler = (io) => {
   io.on("connection", (socket) => {
@@ -20,7 +21,6 @@ const socketHandler = (io) => {
           const lastNumber = parseInt(lastMessage.messageID.replace("msg", ""), 10);
           newMessageID = `msg${(lastNumber + 1).toString().padStart(3, "0")}`;
         }
-
         const newMsg = new messages({
           messageID: newMessageID,
           chatID: data.chatID,
@@ -33,14 +33,17 @@ const socketHandler = (io) => {
         });
 
         const saved = await newMsg.save();
-
+        const chatmember = await Controller.getChatMembersByChatID(data.chatID);
+        if (!chatmember) {
+            io.to(chatmember.memberID).emit("new_message", data);
+        }
         io.to(data.chatID).emit(data.chatID, {
           ...data,
           messageID: saved.messageID,
           timestamp: saved.timestamp,
           status: "sent",
         });
-
+        
         setTimeout(() => {
           io.to(data.chatID).emit(`status_update_${data.chatID}`, {
             messageID: saved.messageID,
