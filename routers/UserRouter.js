@@ -4,6 +4,8 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const Controller = require("../controller/index");
+const upload = require("../middleware/index");
+const uploadToCloudinary = require("../service/index");
 // API lấy danh sách user
 router.get("/users", async (req, res) => {
   try {
@@ -224,6 +226,25 @@ router.put("/update-user", async (req, res) => {
   } catch (err) {
     console.error("Lỗi khi cập nhật người dùng:", err.message);
     res.status(500).json({ message: "Lỗi hệ thống", error: err.message });
+  }
+});
+
+router.post("/upload", upload.array("image",5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "No files uploaded" });
+    }
+    console.log("File:", req.files); // Log file để kiểm tra
+    
+    
+    const urls = req.files.map((file) => {
+     return  uploadToCloudinary(file); // Upload từng file lên Cloudinary
+    });
+    res.json({ urls: await Promise.all(urls) }); // Trả về các URL đã upload
+    
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Upload failed" });
   }
 });
 

@@ -13,6 +13,8 @@ const UserSchema = new mongoose.Schema({
     ngaysinh: { type: Date },
     anhBia: { type: String },
     gioTinh: { type: String, enum: ["Nam", "Nữ", "Khác"] },
+  },{
+    versionKey: false 
   });
   
   const Users = mongoose.model("Users", UserSchema,"Users");
