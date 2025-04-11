@@ -1,4 +1,5 @@
 const messages = require("../models/Messages");
+const Controller = require("../controller/index");
 
 const socketHandler = (io) => {
   io.on("connection", (socket) => {
@@ -61,6 +62,16 @@ const socketHandler = (io) => {
         userID,
         status: "read",
       });
+    });
+
+    socket.on("getChat", async (userID) => {
+        try{
+            const chats = await Controller.getChatByUserID(userID);
+            socket.emit("ChatByUserID", chats);
+        }catch(error){
+            console.error("❌ Error saving message:", error);
+            socket.emit("error", { message: "Lỗi khi lấy danh sách chat" });
+            }
     });
 
     socket.on("disconnect", () => {
