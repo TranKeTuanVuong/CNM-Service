@@ -10,7 +10,7 @@ const chatRoutes = require("./routers/ChatRouter");
 const MessagesRoutes = require("./routers/MessageRouter");
 const chatMembersRoutes = require("./routers/ChatMembersRouter");
 const ContactsRoutes = require("./routers/ContactsRouter");
-const messages = require('../models/Messages');
+const messages = require('./models/Messages');
 
 
 const server = http.createServer(app);
