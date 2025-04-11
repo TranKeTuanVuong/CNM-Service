@@ -6,31 +6,26 @@ const socketHandler = (io) => {
   io.on("connection", (socket) => {
     console.log("🟢 Client connected:", socket.id);
 
-    // Join theo userID để gửi new_message
     socket.on("join_user", (userID) => {
       socket.join(userID);
       console.log(`🧍‍♂️ Socket ${socket.id} joined user room: ${userID}`);
     });
 
-    // Join room theo chatID để nhận cập nhật trong nhóm
     socket.on("join_chat", (chatID) => {
       socket.join(chatID);
       console.log(`🔁 Socket ${socket.id} joined room: ${chatID}`);
     });
 
-    // Gửi tin nhắn mới
     socket.on("send_message", async (data) => {
       console.log(`📨 New message to chat ${data.chatID}`, data);
 
       try {
-        // Tạo messageID mới
         const lastMessage = await messages.findOne().sort({ messageID: -1 });
         const nextID = lastMessage
           ? parseInt(lastMessage.messageID.replace("msg", "")) + 1
           : 1;
         const messageID = `msg${String(nextID).padStart(3, "0")}`;
 
-        // Lưu vào DB
         const newMsg = new messages({
           messageID,
           chatID: data.chatID,
@@ -44,13 +39,11 @@ const socketHandler = (io) => {
 
         const saved = await newMsg.save();
 
-        // Lấy các thành viên trong đoạn chat
         const chatMembers = await ChatMembers.find({ chatID: data.chatID });
         const receiverIDs = chatMembers
           .map((m) => m.userID)
           .filter((id) => id !== data.senderID);
 
-        // Gói tin đầy đủ gửi đi
         const fullMessage = {
           ...data,
           messageID: saved.messageID,
@@ -62,18 +55,13 @@ const socketHandler = (io) => {
           },
         };
 
-        // Gửi tới người nhận qua userID
         receiverIDs.forEach((userID) => {
           io.to(userID).emit("new_message", fullMessage);
         });
 
-        // Gửi lại cho chính người gửi để đồng bộ nếu cần
         io.to(data.senderID).emit("new_message", fullMessage);
-
-        // Gửi vào room nếu đang trong chat
         io.to(data.chatID).emit(data.chatID, fullMessage);
 
-        // Giả lập trạng thái "delivered" sau 1s
         setTimeout(() => {
           messages.findOneAndUpdate(
             { messageID: saved.messageID },
@@ -85,21 +73,34 @@ const socketHandler = (io) => {
             status: "delivered",
           });
         }, 1000);
-
       } catch (error) {
         console.error("❌ Error sending message:", error);
       }
     });
 
-    // Đánh dấu đã đọc
-    socket.on("read_messages", ({ chatID, userID }) => {
-      io.to(chatID).emit(`status_update_${chatID}`, {
-        userID,
-        status: "read",
-      });
+    // ✅ Cập nhật trạng thái đã đọc vào DB
+    socket.on("read_messages", async ({ chatID, userID }) => {
+      try {
+        await messages.findOneAndUpdate(
+          { chatID,userID },
+          { status: "read" },
+        );
+
+        io.to(chatID).emit(`status_update_${chatID}`, {
+          userID,
+          status: "read",
+        });
+
+        io.to(userID).emit("status_update_all", {
+          chatID,
+          userID,
+          status: "read",
+        });
+      } catch (err) {
+        console.error("❌ Error updating read status:", err);
+      }
     });
 
-    // Gửi danh sách đoạn chat cho user
     socket.on("getChat", async (userID) => {
       try {
         const chats = await Controller.getChatsForUser(userID);
