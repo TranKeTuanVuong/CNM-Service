@@ -5,9 +5,10 @@
       messageID: { type: String, unique: true, required: true },
       chatID: { type: String, unique: true, required: true },
       senderID: { type: String, unique: true, required: true },
-      content: { type: String, required: true },
-      type: { type: String, enum: ["text", "image", "video"], required: true },
+      content: { type: String},
+      type: { type: String, enum: ["text", "image", "video"], default: "text" },
       timestamp: { type: Date, default: Date.now },
+      media_url: { type: String},
       status: { type: String, enum: ['sent', 'delivered', 'read'], default: 'sent'},
     },{
       versionKey: false 

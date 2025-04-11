@@ -90,6 +90,7 @@ Controller.getCreatMessageByChatID = async (newMsg)=>{
       content: newMsg.content,
       type: newMsg.type,
       timestamp: newMsg.timestamp,
+      media_url:newMsg.media_url,
       status: newMsg.status,
     });
    const saveMsg= await newMessage.save();
