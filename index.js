@@ -10,6 +10,7 @@ const chatRoutes = require("./routers/ChatRouter");
 const MessagesRoutes = require("./routers/MessageRouter");
 const chatMembersRoutes = require("./routers/ChatMembersRouter");
 const ContactsRoutes = require("./routers/ContactsRouter");
+const messages = require('../models/Messages');
 
 
 const server = http.createServer(app);
@@ -46,27 +47,59 @@ io.on('connection', (socket) => {
   });
 
   // Khi có người gửi tin nhắn
-  socket.on('send_message', (data) => {
+  socket.on('send_message', async (data) => {
     console.log(`📨 New message to chat ${data.chatID}`, data);
-
-    // Gửi lại cho tất cả trong phòng (trừ người gửi cũng được nếu muốn)
-    io.to(data.chatID).emit(data.chatID, data); 
+  
+    try {
+      // Lấy message cuối để tạo ID tăng dần
+      const lastMessage = await messages.findOne().sort({ messageID: -1 }).limit(1);
+  
+      let newMessageID = "msg001"; // mặc định
+      if (lastMessage && lastMessage.messageID) {
+        const lastNumber = parseInt(lastMessage.messageID.replace('msg', ''), 10);
+        newMessageID = `msg${(lastNumber + 1).toString().padStart(3, '0')}`;
+      }
+  
+      // Tạo document mới
+      const newMsg = new messages({
+        messageID: newMessageID,
+        chatID: data.chatID,
+        senderID: data.senderID,
+        content: data.content || "",
+        type: data.type || "text", // text / image / video
+        timestamp: data.timestamp || Date.now(),
+        media_url: data.media_url || [],
+        status: "sent"
+      });
+  
+      const saved = await newMsg.save(); // lưu vào MongoDB
+  
+      // Emit lại tin nhắn cho tất cả người dùng trong phòng
+      io.to(data.chatID).emit(data.chatID, {
+        ...data,
+        messageID: saved.messageID,
+        timestamp: saved.timestamp,
+        status: 'sent',
+      });
+  
+      // Sau 1 giây gửi status "delivered"
+      setTimeout(() => {
+        io.to(data.chatID).emit(`status_update_${data.chatID}`, {
+          messageID: saved.messageID,
+          status: 'delivered',
+        });
+  
+        // (Tuỳ chọn) cập nhật status trong DB
+        messages.findOneAndUpdate(
+          { messageID: saved.messageID },
+          { status: 'delivered' }
+        ).exec();
+      }, 1000);
+  
+    } catch (error) {
+      console.error("❌ Error saving message:", error);
+    }
   });
-  // Khi nhận tin → gửi lại cho phòng
-socket.on('send_message', (data) => {
-  io.to(data.chatID).emit(data.chatID, {
-    ...data,
-    status: 'sent'
-  });
-
-  // Giả lập người nhận đã "delivered" sau 1s
-  setTimeout(() => {
-    io.to(data.chatID).emit(`status_update_${data.chatID}`, {
-      messageID: data.tempID, // hoặc _id nếu có DB
-      status: 'delivered',
-    });
-  }, 1000);
-});
 
 // Người dùng mở phòng → báo "read"
 socket.on('read_messages', ({ chatID, userID }) => {
