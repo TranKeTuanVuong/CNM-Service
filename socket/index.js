@@ -6,19 +6,20 @@ const socketHandler = (io) => {
   io.on("connection", (socket) => {
     console.log("🟢 Client connected:", socket.id);
 
+    // Tham gia phòng người dùng cá nhân
     socket.on("join_user", (userID) => {
       socket.join(userID);
       console.log(`🧍‍♂️ Socket ${socket.id} joined user room: ${userID}`);
     });
 
+    // Tham gia phòng chat cụ thể
     socket.on("join_chat", (chatID) => {
       socket.join(chatID);
-      console.log(`🔁 Socket ${socket.id} joined room: ${chatID}`);
+      console.log(`🔁 Socket ${socket.id} joined chat room: ${chatID}`);
     });
 
+    // Gửi tin nhắn mới
     socket.on("send_message", async (data) => {
-      console.log(`📨 New message to chat ${data.chatID}`, data);
-
       try {
         const lastMessage = await messages.findOne().sort({ messageID: -1 });
         const nextID = lastMessage
@@ -78,12 +79,12 @@ const socketHandler = (io) => {
       }
     });
 
-    // ✅ Cập nhật trạng thái đã đọc vào DB
+    // Cập nhật trạng thái đã đọc
     socket.on("read_messages", async ({ chatID, userID }) => {
       try {
-        await messages.findOneAndUpdate(
-          { chatID,userID },
-          { status: "read" },
+        await messages.updateMany(
+          { chatID, status: { $ne: "read" } },
+          { status: "read" }
         );
 
         io.to(chatID).emit(`status_update_${chatID}`, {
@@ -101,6 +102,7 @@ const socketHandler = (io) => {
       }
     });
 
+    // Lấy danh sách chat của user
     socket.on("getChat", async (userID) => {
       try {
         const chats = await Controller.getChatsForUser(userID);
@@ -111,6 +113,43 @@ const socketHandler = (io) => {
       }
     });
 
+    // ✅ Thu hồi tin nhắn
+    socket.on("unsend_message", async ({ messageID, chatID, senderID }) => {
+      try {
+        const message = await messages.findOne({ messageID });
+
+        if (!message || message.senderID !== senderID) {
+          console.warn("⚠️ Unauthorized unsend or not found");
+          return;
+        }
+
+        message.isUnsent = true;
+        message.content = "";
+        message.media_url = [];
+        await message.save();
+
+        const unsentData = {
+          messageID,
+          chatID,
+          senderID,
+          isUnsent: true,
+          timestamp: Date.now(),
+        };
+
+        io.to(chatID).emit("unsend_notification", unsentData);
+
+        const members = await ChatMembers.find({ chatID });
+        members.forEach((m) => {
+          io.to(m.userID).emit("unsend_notification", unsentData);
+        });
+
+        console.log("❌ Message unsent:", messageID);
+      } catch (error) {
+        console.error("❌ Error unsending message:", error);
+      }
+    });
+
+    // Ngắt kết nối
     socket.on("disconnect", () => {
       console.log("🔴 Client disconnected:", socket.id);
     });
