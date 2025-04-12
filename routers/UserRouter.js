@@ -256,9 +256,10 @@ router.post("/upload", upload.array("image",5), async (req, res) => {
     console.log("File:", req.files); // Log file để kiểm tra
     
     
-    const urls = req.files.map((file) => {
-     return  uploadToCloudinary(file); // Upload từng file lên Cloudinary
-    });
+    const urls = await Promise.all(
+      req.files.map(async (file) => await uploadToCloudinary(file))
+    );
+
     res.json({ urls: await Promise.all(urls) }); // Trả về các URL đã upload
     
   } catch (error) {
