@@ -17,6 +17,6 @@ const io = new Server(server, {
 
 socketHandler(io);
 
-server.listen(SOCKET_PORT, () =>
-  console.log(`🚀 Server with Socket.IO running on port ${SOCKET_PORT}`)
+server.listen(PORT, () =>
+  console.log(`🚀 Server with Socket.IO running on port ${PORT}`)
 );

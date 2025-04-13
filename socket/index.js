@@ -3,8 +3,16 @@ const ChatMembers = require("../models/ChatMember");
 const Controller = require("../controller/index");
 
 const socketHandler = (io) => {
+  const users = {}; // Lưu trữ các người dùng và số điện thoại của họ
+
   io.on("connection", (socket) => {
     console.log("🟢 Client connected:", socket.id);
+
+    // Đăng ký số điện thoại của người dùng khi họ kết nối
+    socket.on("registerPhoneNumber", (phoneNumber) => {
+      users[phoneNumber] = socket.id; // Lưu socket id với số điện thoại
+      console.log(`User with phone number ${phoneNumber} connected`);
+    });
 
     // Tham gia phòng người dùng cá nhân
     socket.on("join_user", (userID) => {
@@ -101,6 +109,53 @@ const socketHandler = (io) => {
         console.error("❌ Error updating read status:", err);
       }
     });
+
+    // Gửi lời mời kết bạn theo sdt
+socket.on("send_friend_request", async (data) => {
+  try {
+    const { senderID, senderPhone, recipientPhone } = data;
+
+    // Kiểm tra nếu người nhận có kết nối
+    const recipientSocketId = users[recipientPhone];
+    if (!recipientSocketId) {
+      console.warn(`⚠️ User with phone number ${recipientPhone} is not connected`);
+      return;
+    }
+
+    // Kiểm tra nếu userID có tồn tại và hợp lệ
+    if (!senderID || !recipientPhone) {
+      console.error("❌ Missing senderID or recipientPhone");
+      return;
+    }
+
+    // Tạo và lưu yêu cầu kết bạn vào Contacts
+    const friendRequestData = {
+      senderID,            // ID của người gửi yêu cầu
+      senderPhone,         // Số điện thoại người gửi
+      recipientPhone,      // Số điện thoại người nhận
+      status: "pending",    // Trạng thái yêu cầu kết bạn
+      timestamp: Date.now(), // Thời gian gửi yêu cầu
+    };
+
+    // Lưu vào model Contacts
+    const newFriendRequest = new Contacts({
+      userID: senderID, // userID của người gửi yêu cầu (có thể là senderID)
+      contactID: recipientPhone, // contactID có thể là số điện thoại người nhận
+      alias: "Default Alias",  // Nếu có thể, hãy thêm một alias tùy chọn
+      status: "pending", // Trạng thái yêu cầu kết bạn
+    });
+
+    await newFriendRequest.save(); // Lưu vào MongoDB
+
+    // Phát sự kiện đến cả người nhận và người gửi yêu cầu kết bạn
+    io.to(recipientSocketId).emit("new_friend_request", friendRequestData);
+    io.to(senderID).emit("new_friend_request", friendRequestData);
+
+    console.log("📩 Friend request sent:", friendRequestData);
+  } catch (error) {
+    console.error("❌ Error sending friend request:", error);
+  }
+});
 
     // Lấy danh sách chat của user
     socket.on("getChat", async (userID) => {
