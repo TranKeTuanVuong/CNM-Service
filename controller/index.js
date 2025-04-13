@@ -123,7 +123,7 @@ Controller.getContacts = async (userID) => {
 
     // Nếu không có yêu cầu nào
     if (pendingRequests.length === 0) {
-      return res.status(200).json({ message: 'Không có yêu cầu kết bạn nào đang chờ.' });
+      return null;
     }
 
     // Fetch thông tin chi tiết người gửi yêu cầu (người có contactID)
@@ -148,10 +148,10 @@ Controller.getContacts = async (userID) => {
     }
 
     // Trả về danh sách yêu cầu kết bạn đang chờ với thông tin người gửi
-    res.status(200).json(friendDetails);
+   return friendDetails ;
   } catch (error) {
     console.error('Lỗi khi lấy danh sách yêu cầu kết bạn:', error);
-    res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+    return null;
   }
 };
 
