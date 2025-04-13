@@ -112,16 +112,15 @@ const socketHandler = (io) => {
       }
     });
     socket.on("getContacts", async (userID) => {
-      try{
+      try {
         const contacts = await Controller.getContacts(userID);
         socket.emit("contacts", contacts);
-
-      }catch (error) {
+      } catch (error) {
         console.error("❌ Error getting contacts:", error);
         socket.emit("error", { message: "Lỗi khi lấy danh sách liên hệ" });
       }
     });
-    // Gửi lời mời kết bạn theo sdt
+    
     socket.on("send_friend_request", async (data) => {
       try {
         const { senderID, senderPhone, recipientPhone } = data;
@@ -165,7 +164,6 @@ const socketHandler = (io) => {
       }
     });
     
-
     // Lấy danh sách chat của user
     socket.on("getChat", async (userID) => {
       try {
