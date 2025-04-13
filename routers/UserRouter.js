@@ -248,7 +248,7 @@ router.put("/update-user", async (req, res) => {
   }
 });
 
-router.post("/upload", upload.array("image",5), async (req, res) => {
+router.post("/upload", upload.array("files"), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: "No files uploaded" });
