@@ -113,44 +113,45 @@ Controller.getChatMembersByChatID = async (chatID) => {
 }
 };
 Controller.getContacts = async (userID) => {
+  
   try {
-    // Find all pending friend requests where the user is the receiver
+    // Tìm tất cả các yêu cầu kết bạn đang chờ mà người nhận là userID (contactID trong Contacts)
     const pendingRequests = await Contacts.find({
-      userID: userID,  // The user is the receiver
-      status: 'pending'   // Only look for pending requests
+      contactID: userID,  // Người nhận là contactID (userID của người nhận yêu cầu)
+      status: 'pending'   // Chỉ lấy những yêu cầu đang chờ
     }).exec();
 
-    // If there are no pending requests
+    // Nếu không có yêu cầu nào
     if (pendingRequests.length === 0) {
-      return null
+      return res.status(200).json({ message: 'Không có yêu cầu kết bạn nào đang chờ.' });
     }
 
-    // Fetch user details for each contactID (sender of the request)
+    // Fetch thông tin chi tiết người gửi yêu cầu (người có contactID)
     const friendDetails = [];
 
-    // Loop through each pending request
+    // Duyệt qua tất cả các yêu cầu đang chờ
     for (let request of pendingRequests) {
-      const contactID = request.userID; // The contactID is the sender of the request
+      const senderID = request.userID; // userID là người gửi yêu cầu
 
-      // Fetch user details for the contact (sender)
-      const contactUser = await Users.findOne({ userID: contactID }).select('name anhDaiDien sdt').exec();
+      // Lấy thông tin người gửi từ Users
+      const senderUser = await Users.findOne({ userID: senderID }).select('name anhDaiDien sdt').exec();
 
-      if (contactUser) {
+      if (senderUser) {
         friendDetails.push({
-          contactID,
-          name: contactUser.name,
-          avatar: contactUser.anhDaiDien,
-          phoneNumber: contactUser.sdt,
-          alias: request.alias // The alias from the Contact collection
+          userID: senderID,  // Trả về userID của người gửi yêu cầu kết bạn (người đã gửi)
+          name: senderUser.name,
+          avatar: senderUser.anhDaiDien,
+          phoneNumber: senderUser.sdt,
+          alias: request.alias // Alias từ bảng Contacts
         });
       }
     }
 
-    // Return the list of pending requests with user details
-   return friendDetails;
+    // Trả về danh sách yêu cầu kết bạn đang chờ với thông tin người gửi
+    res.status(200).json(friendDetails);
   } catch (error) {
     console.error('Lỗi khi lấy danh sách yêu cầu kết bạn:', error);
-    return null; // Hoặc xử lý lỗi theo cách khác
+    res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
   }
 };
 
