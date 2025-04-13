@@ -109,7 +109,16 @@ const socketHandler = (io) => {
         console.error("❌ Error updating read status:", err);
       }
     });
+    socket.on("getContacts", async (userID) => {
+      try{
+        const contacts = await Controller.getContacts(userID);
+        socket.emit("contacts", contacts);
 
+      }catch (error) {
+        console.error("❌ Error getting contacts:", error);
+        socket.emit("error", { message: "Lỗi khi lấy danh sách liên hệ" });
+      }
+    });
     // Gửi lời mời kết bạn theo sdt
 socket.on("send_friend_request", async (data) => {
   try {

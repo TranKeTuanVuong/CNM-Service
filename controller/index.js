@@ -111,5 +111,48 @@ Controller.getChatMembersByChatID = async (chatID) => {
     res.status(500).json({ error: error.message });
 }
 };
+Controller.getContacts = async (userID) => {
+  try {
+    // Find all pending friend requests where the user is the receiver
+    const pendingRequests = await Contacts.find({
+      contactID: userID,  // The user is the receiver
+      status: 'pending'   // Only look for pending requests
+    }).exec();
+
+    // If there are no pending requests
+    if (pendingRequests.length === 0) {
+      return res.status(200).json({ message: 'Không có yêu cầu kết bạn nào đang chờ.' });
+    }
+
+    // Fetch user details for each contactID (sender of the request)
+    const friendDetails = [];
+
+    // Loop through each pending request
+    for (let request of pendingRequests) {
+      const contactID = request.userID; // The contactID is the sender of the request
+
+      // Fetch user details for the contact (sender)
+      const contactUser = await Users.findOne({ userID: contactID }).select('name anhDaiDien sdt').exec();
+
+      if (contactUser) {
+        friendDetails.push({
+          contactID,
+          name: contactUser.name,
+          avatar: contactUser.anhDaiDien,
+          phoneNumber: contactUser.sdt,
+          alias: request.alias // The alias from the Contact collection
+        });
+      }
+    }
+
+    // Return the list of pending requests with user details
+    res.status(200).json(friendDetails);
+  } catch (error) {
+    console.error('Lỗi khi lấy danh sách yêu cầu kết bạn:', error);
+    res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+  }
+};
+
+
 
 module.exports = Controller;
