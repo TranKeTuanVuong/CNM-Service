@@ -6,6 +6,9 @@ const bcrypt = require("bcryptjs");
 const Controller = require("../controller/index");
 const upload = require("../middleware/index");
 const uploadToCloudinary = require("../service/index");
+const cors = require("cors");
+// Middleware CORS
+router.use(cors({ origin: "*" }));
 // API lấy danh sách user
 router.get("/users", async (req, res) => {
   try {
