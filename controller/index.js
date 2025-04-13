@@ -116,7 +116,7 @@ Controller.getContacts = async (userID) => {
   try {
     // Find all pending friend requests where the user is the receiver
     const pendingRequests = await Contacts.find({
-      contactID: userID,  // The user is the receiver
+      userID: userID,  // The user is the receiver
       status: 'pending'   // Only look for pending requests
     }).exec();
 
