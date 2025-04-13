@@ -31,19 +31,20 @@ async function uploadToCloudinary(file) {
     throw new Error(`${file.originalname} is not a supported file format`);
   }
 
-  const publicId = `${randomString()}_${Date.now()}`;
+  const publicId = `${fileType}_${randomString()}_${Date.now()}`;
 
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: fileType === "image" ? "AnhChat" : "VideoChat",
         public_id: publicId,
-        resource_type: "auto", // Rất quan trọng: Cloudinary sẽ tự nhận diện là ảnh hay video
+        resource_type: "auto",
+        // Bạn có thể thêm các option khác của Cloudinary ở đây nếu cần
       },
       (error, result) => {
         if (error) {
           console.error("Cloudinary upload error:", error);
-          return reject(error);
+          return reject(`Upload failed for file ${file.originalname}: ${error.message}`);
         }
         return resolve(result.secure_url);
       }
