@@ -3,6 +3,7 @@ const Chats = require('../models/Chat');
 const ChatMembers = require('../models/ChatMember');
 const messages = require('../models/Messages');
 const Users = require('../models/User');
+const Contacts = require("../models/Contacts");
 const Controller = {};
 Controller.sendOtpEmail = async (recipientEmail, otp) => {
   // Tạo một đối tượng transporter để cấu hình phương thức gửi email:

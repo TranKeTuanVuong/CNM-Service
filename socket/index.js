@@ -1,6 +1,7 @@
 const messages = require("../models/Messages");
 const ChatMembers = require("../models/ChatMember");
 const Controller = require("../controller/index");
+const Contacts = require("../models/Contacts");
 
 const socketHandler = (io) => {
   const users = {}; // Lưu trữ các người dùng và số điện thoại của họ
