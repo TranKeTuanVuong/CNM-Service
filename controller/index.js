@@ -121,7 +121,7 @@ Controller.getContacts = async (userID) => {
 
     // If there are no pending requests
     if (pendingRequests.length === 0) {
-      return res.status(200).json({ message: 'Không có yêu cầu kết bạn nào đang chờ.' });
+      return null
     }
 
     // Fetch user details for each contactID (sender of the request)
@@ -146,10 +146,10 @@ Controller.getContacts = async (userID) => {
     }
 
     // Return the list of pending requests with user details
-    res.status(200).json(friendDetails);
+   return friendDetails;
   } catch (error) {
     console.error('Lỗi khi lấy danh sách yêu cầu kết bạn:', error);
-    res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+    return null; // Hoặc xử lý lỗi theo cách khác
   }
 };
 
