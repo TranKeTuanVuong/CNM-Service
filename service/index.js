@@ -13,6 +13,12 @@ function bufferToStream(buffer) {
 const FILE_TYPE_MATCH = {
   image: ["image/png", "image/jpeg", "image/jpg", "image/gif"],
   video: ["video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"],
+  audio: [
+    "audio/mpeg",   // .mp3
+    "audio/wav",
+    "audio/webm",
+    "audio/ogg"
+  ]
 };
 
 function randomString(length = 6) {
@@ -23,7 +29,9 @@ function randomString(length = 6) {
 async function uploadToCloudinary(file) {
   let fileType = null;
 
-  if (FILE_TYPE_MATCH.image.includes(file.mimetype)) {
+  if (FILE_TYPE_MATCH.audio.includes(file.mimetype)) {
+    fileType = "audio";
+  } else if (FILE_TYPE_MATCH.image.includes(file.mimetype)) {
     fileType = "image";
   } else if (FILE_TYPE_MATCH.video.includes(file.mimetype)) {
     fileType = "video";
@@ -36,10 +44,14 @@ async function uploadToCloudinary(file) {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
-        folder: fileType === "image" ? "AnhChat" : "VideoChat",
+        folder:
+          fileType === "image"
+            ? "AnhChat"
+            : fileType === "video"
+            ? "VideoChat"
+            : "AudioChat",
         public_id: publicId,
         resource_type: "auto",
-        // Bạn có thể thêm các option khác của Cloudinary ở đây nếu cần
       },
       (error, result) => {
         if (error) {
@@ -53,5 +65,6 @@ async function uploadToCloudinary(file) {
     bufferToStream(file.buffer).pipe(uploadStream);
   });
 }
+
 
 module.exports = uploadToCloudinary;

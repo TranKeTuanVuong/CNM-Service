@@ -5,6 +5,19 @@ const messages = require('../models/Messages');
 const Users = require('../models/User');
 const Contacts = require("../models/Contacts");
 const Controller = {};
+
+Controller.getUserByID = async (userID) => {
+  try {
+    const user = await Users.findOne({ userID: userID });
+    if (!user) {
+      return null
+    }
+    return user;
+  } catch (error) {
+    console.error('Lỗi khi lấy thông tin người dùng:', error);
+    return null;
+  }
+}
 Controller.sendOtpEmail = async (recipientEmail, otp) => {
   // Tạo một đối tượng transporter để cấu hình phương thức gửi email:
   //   service: 'gmail': dùng Gmail để gửi.
@@ -72,6 +85,70 @@ Controller.getChatsForUser = async (userID) => {
     throw error;
   }
 };
+Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
+  try {
+    // 1. Lấy danh sách chatID mà người dùng đăng nhập tham gia
+    const memberDocs = await ChatMembers.find({ userID: loggedInUserID }).lean();
+    const chatIDs = memberDocs.map(m => m.chatID);
+
+    // 2. Tìm tất cả các chat private trong danh sách đó
+    const privateChats = await Chats.find({ 
+      chatID: { $in: chatIDs },
+      type: 'private'
+    }).lean();
+
+    let targetChat = null;
+
+    // 3. Duyệt từng chat để tìm chat chứa cả 2 người
+    for (const chat of privateChats) {
+      const members = await ChatMembers.find({ chatID: chat.chatID }).lean();
+      const hasUser1 = members.some(m => m.userID === loggedInUserID);
+      const hasUser2 = members.some(m => m.userID === friendUserID);
+      if (hasUser1 && hasUser2) {
+        targetChat = chat;
+        break;
+      }
+    }
+
+    // 4. Nếu không tìm thấy chat, return null
+    if (!targetChat) {
+      console.log("Chưa có chat 1-1 giữa hai người.");
+      return null;
+    }
+
+    // 5. Lấy toàn bộ tin nhắn trong chat
+    const messagesList = await messages.find({ chatID: targetChat.chatID }).sort({ timestamp: 1 }).lean();
+
+    if (messagesList.length === 0) {
+      // Không có tin nhắn nào nhưng vẫn trả về chat với lastMessage là []
+      targetChat.lastMessage = [];
+      return targetChat;
+    }
+
+    // 6. Nếu có tin nhắn, lấy thông tin sender
+    const senderIDs = messagesList.map(msg => msg.senderID);
+    const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
+
+    const enrichedMessages = messagesList.map(msg => {
+      const sender = senders.find(u => u.userID === msg.senderID);
+      return {
+        ...msg,
+        senderInfo: sender ? {
+          name: sender.name,
+          avatar: sender.anhDaiDien || null,
+        } : null,
+      };
+    });
+
+    targetChat.lastMessage = enrichedMessages;
+    return targetChat;
+
+  } catch (error) {
+    console.error("Lỗi khi lấy chat 1-1:", error);
+    throw error;
+  }
+};
+
 Controller.getCreatMessageByChatID = async (newMsg)=>{
   try {
     const lastMessage  = await messages.findOne().sort({ messageID: -1 }).limit(1);
@@ -154,7 +231,79 @@ Controller.getContacts = async (userID) => {
     return null;
   }
 };
+Controller.getContactsByUserID = async (userID) => {
+  try{
+  const constacs = await  Contacts.find({
+      $or: [{ userID: userID }, { contactID: userID }],
+      status: "accepted" // Chỉ lấy những yêu cầu đã được chấp nhận
+    }).exec();
+    return constacs;
+  }catch(error){
+    console.error('Lỗi khi lấy danh sách yêu cầu kết bạn:', error);
+    return null;
+  }
 
+};
+
+Controller.createChat = async (userID1,userID2)=>{
+    try {
+      const lastChat = await Chats.findOne().sort({ chatID: -1 }).limit(1);
+        let chatID = '';
+        console.log("lastChat",lastChat);
+        if (!lastChat || !lastChat.chatID) {
+          chatID = 'chat001';
+        } else {
+          const lastNumber = parseInt(lastChat.chatID.replace('chat', ''), 10);
+          const newNumber = lastNumber + 1;
+          chatID = `chat${newNumber.toString().padStart(3, '0')}`;
+        }
+      const user2 = await Users.findOne({ userID: userID2 });
+      // name: { type: String, required: true },
+      // userID: { type: String, unique: true, required: true },
+      // type: { type: String, required: true },
+      // created_at: { type: Date, default: Date.now },
+      const newChat = new Chats({
+        chatID: chatID,
+        type: 'private',
+        name: user2.name,
+        created_at: Date.now(),
+      });
+      const saveChat = await newChat.save();
+      if (!saveChat) {
+        console.error('Lỗi khi tạo chat:', error);
+        return false;
+      }
+      // userID: { type: String, unique: true, required: true },
+      // memberID: { type: String, unique: true, required: true },
+      // role: { type: String, required: true },
+      // chatID: { type: String, unique: true, required: true }
+      // Tạo chat members cho cả hai người dùng
+      const chatMember1 = new ChatMembers({
+        userID: userID1,
+        memberID: userID2,
+        role: 'admin',
+        chatID: newChat.chatID,
+      });
+      const chatMember2 = new ChatMembers({
+        userID: userID2,
+        memberID: userID1,
+        role: 'member',
+        chatID: newChat.chatID,
+      });
+      const saveChatMember1 = await chatMember1.save();
+      const saveChatMember2 = await chatMember2.save();
+      if (!saveChatMember1 || !saveChatMember2) {
+        console.error('Lỗi khi tạo chat members:', error);
+        return false;
+      }
+      return true;
+
+    } catch (error) {
+      console.error('Lỗi khi tạo chat 1-1:', error);
+      return false;
+      
+    }
+};
 
 
 module.exports = Controller;

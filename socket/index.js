@@ -27,6 +27,30 @@ const socketHandler = (io) => {
       socket.join(chatID);
       console.log(`🔁 Socket ${socket.id} joined chat room: ${chatID}`);
     });
+    // Tham gia phòng chat 1-1
+    socket.on('createChat1-1', async (data) => {
+      try {
+        if (!data?.chatID) {
+          console.error("❌ Không có chatID trong data");
+          return;
+        }
+    
+        const chatmembers = await ChatMembers.find({ chatID: data.chatID });
+    
+        if (!chatmembers.length) {
+          console.log("⚠️ Không tìm thấy thành viên trong chat:", data.chatID);
+          return;
+        }
+    
+        chatmembers.forEach((member) => {
+          io.to(member.userID).emit("newChat1-1", { data });
+          console.log(`📤 Gửi newChat1-1 đến user ${member.userID}`);
+        });
+      } catch (error) {
+        console.error("❌ Error creating chat:", error);
+      }
+    });
+    
 
     // Gửi tin nhắn mới
     socket.on("send_message", async (data) => {
@@ -121,18 +145,43 @@ const socketHandler = (io) => {
       }
     });
     
-    socket.on("send_friend_request", async (data) => {
+    socket.on("send_friend_request", async (data, callback) => {
       try {
-        const { senderID, senderPhone, recipientPhone } = data;
+        const {
+          senderID,
+          senderPhone,
+          recipientPhone,
+          senderName,
+          senderImage,
+        } = data;
     
         const recipientSocketId = users[recipientPhone];
         const senderSocketId = users[senderPhone];
     
-        if (!senderID || !recipientPhone) return;
+        if (!senderID || !senderPhone || !recipientPhone) {
+          callback?.({ success: false, message: "Thiếu thông tin người gửi hoặc người nhận" });
+          return;
+        }
     
         const recipientUser = await Users.findOne({ sdt: recipientPhone });
-        if (!recipientUser) return;
+        if (!recipientUser) {
+          callback?.({ success: false, message: "Không tìm thấy người nhận" });
+          return;
+        }
     
+        // Kiểm tra đã gửi lời mời chưa
+        const existingRequest = await Contacts.findOne({
+          userID: senderID,
+          contactID: recipientUser.userID,
+          status: "pending",
+        });
+    
+        if (existingRequest) {
+          callback?.({ success: false, message: "Đã gửi lời mời trước đó" });
+          return;
+        }
+    
+        // Lưu vào database
         const newFriendRequest = new Contacts({
           userID: senderID,
           contactID: recipientUser.userID,
@@ -146,24 +195,103 @@ const socketHandler = (io) => {
           senderID,
           senderPhone,
           recipientPhone,
+          senderName,
+          senderImage,
           status: "pending",
           timestamp: Date.now(),
         };
     
+        // Gửi real-time cho người nhận
         if (recipientSocketId) {
           io.to(recipientSocketId).emit("new_friend_request", friendRequestData);
         }
     
+        // Gửi lại cho người gửi (nếu cần hiển thị real-time)
         if (senderSocketId) {
-          io.to(senderSocketId).emit("new_friend_request", friendRequestData);
+          io.to(senderSocketId).emit("friend_request_sent", friendRequestData);
         }
     
         console.log("📩 Friend request sent:", friendRequestData);
+        callback?.({ success: true });
+    
       } catch (error) {
         console.error("❌ Error sending friend request:", error);
+        callback?.({ success: false, message: "Lỗi server" });
       }
     });
+    socket.on("accept_friend_request", async (data, callback) => {
+      try {
+        const { senderID, recipientID } = data;
     
+        if (!senderID || !recipientID) {
+          callback?.({ success: false, message: "Thiếu thông tin" });
+          return;
+        }
+    
+        // Cập nhật trạng thái trong Contacts
+        const updatedRequest = await Contacts.findOneAndUpdate(
+          {
+            userID: senderID,
+            contactID: recipientID,
+            status: "pending",
+          },
+          { status: "accepted" },
+          { new: true }
+        );
+    
+        if (!updatedRequest) {
+          callback?.({ success: false, message: "Không tìm thấy lời mời" });
+          return;
+        }
+    
+        // Tạo ngược lại để 2 chiều kết bạn
+        const reciprocal = await Contacts.findOne({
+          userID: recipientID,
+          contactID: senderID,
+        });
+    
+        if (!reciprocal) {
+          const reciprocalRequest = new Contacts({
+            userID: recipientID,
+            contactID: senderID,
+            alias: "Default Alias",
+            status: "accepted",
+          });
+          await reciprocalRequest.save();
+        } else if (reciprocal.status !== "accepted") {
+          reciprocal.status = "accepted";
+          await reciprocal.save();
+        }
+    
+        // Gửi real-time cho cả 2 bên
+        const senderUser = await Users.findOne({ userID: senderID });
+        const recipientUser = await Users.findOne({ userID: recipientID });
+    
+        const senderSocketId = users[senderUser?.sdt];
+        const recipientSocketId = users[recipientUser?.sdt];
+    
+        const acceptedData = {
+          senderID,
+          recipientID,
+          status: "accepted",
+          timestamp: Date.now(),
+        };
+    
+        if (senderSocketId) {
+          io.to(senderSocketId).emit("friend_request_accepted", acceptedData);
+        }
+    
+        if (recipientSocketId) {
+          io.to(recipientSocketId).emit("friend_request_accepted", acceptedData);
+        }
+    
+        callback?.({ success: true });
+      } catch (error) {
+        console.error("❌ Error accepting friend request:", error);
+        callback?.({ success: false, message: "Lỗi server" });
+      }
+    });
+        
     // Lấy danh sách chat của user
     socket.on("getChat", async (userID) => {
       try {

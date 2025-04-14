@@ -4,6 +4,7 @@ const Users = require("../models/User");
 const router = express.Router();
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
+const Controller = require("../controller");
 
 // Middleware để parse dữ liệu từ request
 router.use(bodyParser.json());
@@ -303,4 +304,37 @@ router.get('/display-friend-request/:userID', async (req, res) => {
     res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
   }
 });
+router.post("/ContacsFriendByUserID", async (req,res)=>{
+   try {
+        const { userID } = req.body; // Lấy userID từ yêu cầu
+          if(!userID) {
+            return res.status(400).json({ message: 'Thiếu thông tin userID.' });
+          }
+        const contacts = await Controller.getContactsByUserID(userID); // Gọi hàm để lấy danh sách bạn bè
+          if (!contacts) {
+            return res.status(404).json({ message: 'Không tìm thấy danh sách bạn bè.' });
+          }
+        const friendDetails = [];
+        // Duyệt qua danh sách bạn bè
+        for (let friend of contacts) {
+          // Tìm thông tin người dùng tương ứng với userID và contactID
+              const user = await Users.findOne({ userID: friend.userID === userID ? friend.contactID : friend.userID })
+                .select('userID name sdt anhDaiDien') // Chọn trường name, sdt, anhDaiDien, anhBia
+                .exec();
+              if (user) {
+                friendDetails.push({
+                  userID: user.userID,
+                  name: user.name,
+                  sdt: user.sdt,
+                  anhDaiDien: user.anhDaiDien, // Thêm trường ảnh đại diện
+                });
+              }
+        }
+        // Trả về danh sách bạn bè    
+        res.json(friendDetails);
+    } catch (error) {
+      return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+    }
+});
+
 module.exports = router;  

@@ -50,4 +50,33 @@ router.post('/chats/userID', async (req, res) => {
       res.status(500).json({ message: 'Lỗi server khi lấy thông tin chat' });
     }
 });
+router.post('/chats1-1ByUserID', async (req, res) => {
+  try {
+    const { userID1,userID2 } = req.body;
+    const chats = await Controller.getOneOnOneChat(userID1,userID2);
+    if (!chats) {
+        return res.status(404).json({ message: 'Không tìm thấy cuộc trò chuyện!' });
+    }
+    res.json(chats);
+  } catch (error) {
+    console.error('Lỗi khi lấy danh sách yêu cầu kết bạn:', error);
+    res.status(500).json({ message: 'Lỗi server khi lấy thông tin chat' });
+    
+  }
+});
+router.post('/createChat1-1', async (req, res) => {
+  try{
+    const { userID1, userID2 } = req.body;
+    const chat = await Controller.createChat(userID1, userID2);
+    console.log('Tạo cuộc trò chuyện thành công:', chat);
+    if(chat){
+      const chats = await Controller.getOneOnOneChat(userID1,userID2);
+      console.log('Tạo cuộc trò chuyện thành công:', chats);
+      res.status(200).json(chats);
+    }
+  }catch(error){
+    console.error('Lỗi khi tạo cuộc trò chuyện:', error);
+    res.status(500).json({ message: 'Lỗi server khi tạo cuộc trò chuyện' });
+  }
+});
 module.exports = router;

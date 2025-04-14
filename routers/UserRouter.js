@@ -16,6 +16,16 @@ router.get("/users", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+router.post("/usersID", async (req, res) => {
+  try {
+    const { userID } = req.body;
+    const user = await Users.find({ userID: userID });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 router.post("/login", async (req, res) => {
   const { sdt, matKhau } = req.body;
