@@ -475,5 +475,45 @@ Controller.acceptFriendRequest = async (req, res) => {
         return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
     }
 };
+Controller.displayFriendRequest = async (userID) => {
+    try {
+      if (!userID) {
+        throw new Error("userID không hợp lệ");
+      }
+  
+      // Tìm các yêu cầu kết bạn đang chờ
+      const pendingRequests = await Contacts.find({
+        contactID: userID,
+        status: "pending",
+      }).exec();
+  
+      if (pendingRequests.length === 0) {
+        // Nếu không có yêu cầu kết bạn đang chờ, trả về mảng rỗng thay vì lỗi
+        return [];
+      }
+  
+      const friendDetails = [];
+      for (let request of pendingRequests) {
+        const contactUser = await Users.findOne({ userID: request.userID })
+          .select("name anhDaiDien sdt")
+          .exec();
+  
+        if (contactUser) {
+          friendDetails.push({
+            contactID: request.userID,
+            name: contactUser.name,
+            avatar: contactUser.anhDaiDien,
+            phoneNumber: contactUser.sdt,
+            alias: request.alias,
+          });
+        }
+      }
+  
+      return friendDetails; // Trả về danh sách yêu cầu kết bạn
+    } catch (error) {
+      console.error("❌ Error fetching pending friend requests:", error);
+      throw error; // Ném lỗi để xử lý ở nơi gọi hàm
+    }
+  };
 
 module.exports = Controller;

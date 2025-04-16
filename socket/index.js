@@ -3,7 +3,7 @@ const ChatMembers = require("../models/ChatMember");
 const Controller = require("../controller/index");
 const Contacts = require("../models/Contacts");
 const Users = require("../models/User");
-const contactController = require("../controller/contactController");  // Import contactController
+//const contactController = require("../controller/index");  // Import contactController
  
 
 const socketHandler = (io) => {
