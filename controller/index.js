@@ -304,6 +304,60 @@ Controller.createChat = async (userID1,userID2)=>{
       
     }
 };
+Controller.createContact = async (userID,sdt )=>{
+  try{
+    if (userID === sdt) {
+      return null; // Không cho phép gửi yêu cầu kết bạn cho chính mình
+    }
+      // Tìm người dùng theo số điện thoại
+      const targetUser = await Users.findOne({ sdt: sdt });
+  
+      if (!targetUser) {
+          return null;
+      }
+  
+      // Kiểm tra xem yêu cầu kết bạn đã tồn tại chưa
+      const existingContact = await Contacts.findOne({
+          $or: [
+              { userID: userID, contactID: targetUser.userID }, // Kiểm tra yêu cầu từ userID đến contactID
+              { userID: targetUser.userID, contactID: userID }  // Kiểm tra yêu cầu ngược lại
+          ]
+      });
+  
+      if (existingContact) {
+          if (existingContact.status === 'pending') {
+              return null;
+          } else if (existingContact.status === 'accepted') {
+              return null
+          } else {
+              // Nếu trạng thái không phải là "pending" hay "accepted", chuyển trạng thái thành "pending"
+              existingContact.status = 'pending';
+              await existingContact.save();
+              return ({ message: 'Yêu cầu kết bạn đã được gửi lại!' });
+          }
+      }
+    
+      // Nếu không có yêu cầu kết bạn, tạo yêu cầu mới
+      const newContact = new Contacts({
+          contactID:userID,
+          userID: targetUser.userID,
+          alias: `${targetUser.name}`,
+          status: 'pending', // Trạng thái yêu cầu đang chờ
+          created_at: new Date(),
+      });
+    
+      await newContact.save();
+  
+    if (!newContact) {
+      console.error("Failed to save new contact request.");
+      return;
+    }
+    return newContact
+  }catch (error) {
+    console.error("Error creating contact:", error);
+    return;
+  }
+};
 
 
 module.exports = Controller;
