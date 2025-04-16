@@ -232,17 +232,28 @@ Controller.getContacts = async (userID) => {
   }
 };
 Controller.getContactsByUserID = async (userID) => {
-  try{
-  const constacs = await  Contacts.find({
+  try {
+    // 1. Lấy danh sách kết bạn đã accepted
+    const contacts = await Contacts.find({
       $or: [{ userID: userID }, { contactID: userID }],
-      status: "accepted" // Chỉ lấy những yêu cầu đã được chấp nhận
+      status: "accepted"
     }).exec();
-    return constacs;
-  }catch(error){
-    console.error('Lỗi khi lấy danh sách yêu cầu kết bạn:', error);
+      
+    // 2. Lấy danh sách userIDs là bạn của user đang đăng nhập
+    const friendIDs = contacts.map(contact => {
+      return contact.userID === userID ? contact.contactID : contact.userID;
+    });
+
+    // 3. Truy vấn thông tin người dùng từ danh sách bạn
+    const friends = await Users.find({ userID: { $in: friendIDs } })
+      .select('userID anhDaiDien sdt email name trangThai') // chọn các trường bạn cần
+      .exec();
+
+    return friends;
+  } catch (error) {
+    console.error('Lỗi khi lấy danh sách bạn bè:', error);
     return null;
   }
-
 };
 
 Controller.createChat = async (userID1,userID2)=>{

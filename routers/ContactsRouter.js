@@ -305,4 +305,17 @@ router.get('/display-friend-request/:userID', async (req, res) => {
      res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
    }
  });
+
+ router.post('/ContacsFriendByUserID', async (req, res) => {
+      try {
+      const  {userID} = req.body;
+        const contacts = await Controller.getContactsByUserID(userID);
+        if (!contacts) {
+          return res.status(404).json({ message: 'Không tìm thấy danh bạ!' });
+        }
+        res.status(200).json(contacts);
+      } catch (error) {
+        return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+      }
+ });
 module.exports = router;  
