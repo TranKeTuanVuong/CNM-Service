@@ -358,6 +358,122 @@ Controller.createContact = async (userID,sdt )=>{
     return;
   }
 };
+// Hàm từ chối yêu cầu kết bạn
+Controller.rejectFriendRequest = async (req, res) => {
+    const { userID, contactID } = req.body;
 
+    try {
+        const contactRequest = await Contacts.findOneAndDelete({
+            userID: contactID,
+            contactID: userID,
+            status: 'pending'
+        });
+
+        if (!contactRequest) {
+            return res.status(404).json({ message: 'Không tìm thấy yêu cầu kết bạn để từ chối.' });
+        }
+
+        return res.status(200).json({ message: 'Yêu cầu kết bạn đã bị từ chối!' });
+    } catch (error) {
+        console.error('Lỗi khi từ chối yêu cầu kết bạn:', error);
+        return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+    }
+};
+
+// Tìm kiếm bạn bè theo số điện thoại
+Controller.searchFriendByPhone = async (req, res) => {
+    const { phoneNumber, userID } = req.body;
+
+    if (!phoneNumber || !userID) {
+        return res.status(400).json({ message: 'Số điện thoại và userID là bắt buộc!' });
+    }
+
+    const phoneRegex = /^(0[3,5,7,8,9])[0-9]{8}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+        return res.status(400).json({ message: 'Số điện thoại không hợp lệ!' });
+    }
+
+    try {
+        const currentUser = await Users.findOne({ userID });
+        if (currentUser && phoneNumber === currentUser.sdt) {
+            return res.status(200).json({
+                userID: currentUser.userID,
+                anhBia: currentUser.anhBia,
+                name: currentUser.name,
+                phoneNumber: currentUser.sdt,
+                avatar: currentUser.anhDaiDien,
+                friendStatus: "self"
+            });
+        }
+
+        const targetUser = await Users.findOne({ sdt: phoneNumber });
+
+        if (!targetUser) {
+            return res.status(404).json({ message: 'Không tìm thấy người dùng với số điện thoại này.' });
+        }
+
+        const existingContact = await Contacts.findOne({
+            $or: [
+                { userID: userID, contactID: targetUser.userID },
+                { userID: targetUser.userID, contactID: userID }
+            ]
+        });
+
+        let friendStatus = 'none';
+
+        if (existingContact) {
+            if (existingContact.status === 'pending') {
+                friendStatus = 'pending';
+            } else if (existingContact.status === 'accepted') {
+                friendStatus = 'accepted';
+            } else {
+                friendStatus = 'rejected';
+            }
+        }
+
+        res.status(200).json({
+            userID: targetUser.userID,
+            name: targetUser.name,
+            phoneNumber: targetUser.sdt,
+            friendStatus: friendStatus,
+            avatar: targetUser.anhDaiDien
+        });
+    } catch (error) {
+        console.error('Lỗi khi tìm kiếm người dùng:', error);
+        res.status(500).json({ message: 'Có lỗi xảy ra khi tìm kiếm người dùng.' });
+    }
+};
+Controller.acceptFriendRequest = async (req, res) => {
+    const { contactID, userID } = req.body;
+
+    if (!contactID || !userID) {
+        return res.status(400).json({ message: 'Thiếu thông tin contactID hoặc userID.' });
+    }
+
+    try {
+        const contactRequest = await Contacts.findOne({
+            userID: contactID,
+            contactID: userID,
+            status: 'pending'
+        });
+
+        if (!contactRequest) {
+            return res.status(404).json({ message: 'Không tìm thấy yêu cầu kết bạn để chấp nhận.' });
+        }
+
+        contactRequest.status = 'accepted';
+        await contactRequest.save();
+
+        await Contacts.updateOne(
+            { userID: userID, contactID: contactID, status: 'pending' },
+            { $set: { status: 'accepted' } }
+        );
+
+        return res.status(200).json({ message: 'Yêu cầu kết bạn đã được chấp nhận!' });
+    } catch (error) {
+        console.error('Lỗi khi chấp nhận yêu cầu kết bạn:', error);
+        return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+    }
+};
 
 module.exports = Controller;
