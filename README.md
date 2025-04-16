@@ -6,6 +6,8 @@ npm i cloudinary multer multer-storage-cloudinary
  --dùng để gửi email từ ứng dụng--
 npm install nodemailer
 npm install socket.io
+npm install fluent-ffmpeg ffmpeg-static
+
 
 
 
