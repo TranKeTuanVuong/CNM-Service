@@ -12,6 +12,6 @@ router.use(bodyParser.json());
  router.post('/reject-friend-request', contactController.rejectFriendRequest);
 // router.get('/friends/:userID', contactController.getFriends);
  router.post('/search-friend-by-phone', contactController.searchFriendByPhone);
-// router.get('/display-friend-request/:userID', contactController.displayFriendRequest);
+ router.get('/display-friend-request/:userID', contactController.displayFriendRequest);
 
 module.exports = router;

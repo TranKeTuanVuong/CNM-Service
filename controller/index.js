@@ -476,44 +476,53 @@ Controller.acceptFriendRequest = async (req, res) => {
     }
 };
 Controller.displayFriendRequest = async (userID) => {
-    try {
-      if (!userID) {
-        throw new Error("userID không hợp lệ");
-      }
-  
-      // Tìm các yêu cầu kết bạn đang chờ
-      const pendingRequests = await Contacts.find({
-        contactID: userID,
-        status: "pending",
-      }).exec();
-  
-      if (pendingRequests.length === 0) {
-        // Nếu không có yêu cầu kết bạn đang chờ, trả về mảng rỗng thay vì lỗi
-        return [];
-      }
-  
-      const friendDetails = [];
-      for (let request of pendingRequests) {
-        const contactUser = await Users.findOne({ userID: request.userID })
-          .select("name anhDaiDien sdt")
-          .exec();
-  
-        if (contactUser) {
-          friendDetails.push({
-            contactID: request.userID,
-            name: contactUser.name,
-            avatar: contactUser.anhDaiDien,
-            phoneNumber: contactUser.sdt,
-            alias: request.alias,
-          });
-        }
-      }
-  
-      return friendDetails; // Trả về danh sách yêu cầu kết bạn
-    } catch (error) {
-      console.error("❌ Error fetching pending friend requests:", error);
-      throw error; // Ném lỗi để xử lý ở nơi gọi hàm
+  try {
+    if (!userID) {
+      throw new Error("userID không hợp lệ");
     }
-  };
+
+    // Tìm các yêu cầu kết bạn đang chờ mà userID là người gửi hoặc người nhận
+    const pendingRequests = await Contacts.find({
+      $or: [
+        { contactID: userID },
+        { userID: userID }
+      ],
+      status: "pending",
+    }).exec();
+
+    if (pendingRequests.length === 0) {
+      return [];
+    }
+
+    const friendDetails = [];
+
+    for (let request of pendingRequests) {
+      // Xác định ai là người gửi (không phải user hiện tại)
+      const targetUserID = (request.contactID === userID) 
+        ? request.userID 
+        : request.contactID;
+
+      const senderUser = await Users.findOne({ userID: targetUserID })
+        .select("name anhDaiDien sdt")
+        .exec();
+
+      if (senderUser) {
+        friendDetails.push({
+          contactID: targetUserID,
+          name: senderUser.name,
+          avatar: senderUser.anhDaiDien,
+          phoneNumber: senderUser.sdt,
+          alias: request.alias,
+        });
+      }
+    }
+
+    return friendDetails;
+  } catch (error) {
+    console.error("❌ Error fetching pending friend requests:", error);
+    throw error;
+  }
+};
+
 
 module.exports = Controller;
