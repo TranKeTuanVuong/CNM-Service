@@ -1,79 +1,19 @@
+// routers/ContactsRouter.js
 const express = require("express");
-const Contacts = require("../models/Contacts"); // Đảm bảo bạn sử dụng đúng đường dẫn
-const Users = require("../models/User");
 const router = express.Router();
 const bodyParser = require('body-parser');
-const mongoose = require('mongoose');
-const Controller = require("../controller");
+const contactController = require("../controller/index");
 
-// Middleware để parse dữ liệu từ request
 router.use(bodyParser.json());
 
-const isValidPhoneNumber = (phoneNumber) => {
-    const phoneRegex = /^(0[3,5,7,8,9])[0-9]{8}$/;
-    return phoneRegex.test(phoneNumber);
-  };
-  // API để gửi yêu cầu kết bạn
-  router.post('/send-friend-request', async (req, res) => {
-    const { phoneNumber, userID } = req.body;
-  
-    // Kiểm tra nếu người dùng gửi yêu cầu cho chính mình
-    if (userID === phoneNumber) {
-      return res.status(400).json({ message: "Bạn không thể gửi yêu cầu kết bạn cho chính mình!" });
-    }
-  
-    // Kiểm tra số điện thoại có hợp lệ không
-    if (!isValidPhoneNumber(phoneNumber)) {
-      return res.status(400).json({ message: 'Số điện thoại không hợp lệ!' });
-    }
-  
-    try {
-      // Tìm người dùng theo số điện thoại
-      const targetUser = await Users.findOne({ sdt: phoneNumber });
-  
-      if (!targetUser) {
-        return res.status(404).json({ message: 'Không tìm thấy người dùng với số điện thoại này.' });
-      }
-  
-      // Kiểm tra xem yêu cầu kết bạn đã tồn tại chưa
-      const existingContact = await Contacts.findOne({
-        $or: [
-          { userID: userID, contactID: targetUser.userID }, // Kiểm tra yêu cầu từ userID đến contactID
-          { userID: targetUser.userID, contactID: userID }  // Kiểm tra yêu cầu ngược lại
-        ]
-      });
-  
-      if (existingContact) {
-        if (existingContact.status === 'pending') {
-          return res.status(400).json({ message: 'Yêu cầu kết bạn đang chờ xử lý.' });
-        } else if (existingContact.status === 'accepted') {
-          return res.status(400).json({ message: 'Bạn đã là bạn bè với người này!' });
-        } else {
-          // Nếu trạng thái không phải là "pending" hay "accepted", chuyển trạng thái thành "pending"
-          existingContact.status = 'pending';
-          await existingContact.save();
-          return res.status(200).json({ message: 'Yêu cầu kết bạn đã được gửi lại!' });
-        }
-      }
-  
-      // Nếu không có yêu cầu kết bạn, tạo yêu cầu mới
-      const newContact = new Contacts({
-        contactID: targetUser.userID,
-        userID: userID,
-        alias: `${targetUser.name}`,
-        status: 'pending', // Trạng thái yêu cầu đang chờ
-        created_at: new Date(),
-      });
-  
-      await newContact.save();
-  
-      return res.status(200).json({ message: 'Yêu cầu kết bạn đã được gửi!' });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
-    }
-  });
-  
+// Các API sử dụng controller
+// router.post('/send-friend-request', contactController.sendFriendRequest);
+ router.post('/accept-friend-request', contactController.acceptFriendRequest);
+ router.post('/reject-friend-request', contactController.rejectFriendRequest);
+// router.get('/friends/:userID', contactController.getFriends);
+ router.post('/search-friend-by-phone', contactController.searchFriendByPhone);
+ router.get('/display-friend-request/:userID', contactController.displayFriendRequest);
+
 
   
   router.post('/accept-friend-request', async (req, res) => {
@@ -319,3 +259,5 @@ router.get('/display-friend-request/:userID', async (req, res) => {
       }
  });
 module.exports = router;  
+
+

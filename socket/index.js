@@ -3,6 +3,8 @@ const ChatMembers = require("../models/ChatMember");
 const Controller = require("../controller/index");
 const Contacts = require("../models/Contacts");
 const Users = require("../models/User");
+//const contactController = require("../controller/index");  // Import contactController
+ 
 
 const socketHandler = (io) => {
   const users = {}; // Lưu trữ các người dùng và số điện thoại của họ
@@ -142,6 +144,114 @@ const socketHandler = (io) => {
       } catch (error) {
         console.error("❌ Error getting contacts:", error);
         socket.emit("error", { message: "Lỗi khi lấy danh sách liên hệ" });
+      }
+    });
+
+
+// giui loi moi ket ban
+socket.on("send_friend_request", async (data) => {
+  // Kiểm tra xem recipientID có tồn tại hay không
+  if (!data.recipientID) {
+    console.error("Recipient ID is missing or invalid.");
+    return; 
+  }
+  try {
+          const newContact = await Controller.createContact(data.senderID,data.recipientPhone);
+  if (!newContact) {
+    console.error("Failed to save new contact request.");
+    return;
+  }
+  const User = await Users.findOne({ userID: data.senderID });
+  if (!User) {
+    console.error("Failed to find user for senderID:", data.senderID);
+    return;
+  }
+  io.to(data.recipientID).emit("new_friend_request", {
+    ContactID: data.senderID,
+    name:User.name,
+    avatar:User.anhDaiDien
+  }); // Gửi yêu cầu kết bạn đến người nhận
+  io.to(data.senderID).emit('friend_request_sent', {
+    userID: data.recipientID,
+    name: targetUser.name,
+    avatar: targetUser.anhDaiDien
+  });
+  }catch (error) {
+    console.error("❌ Error sending friend request:", error);
+    socket.emit("error", { message: "Lỗi server" });
+  }
+});
+
+    socket.on("accept_friend_request", async (data, callback) => {
+      try {
+        const { senderID, recipientID } = data;
+    
+        if (!senderID || !recipientID) {
+          callback?.({ success: false, message: "Thiếu thông tin" });
+          return;
+        }
+    
+        // Cập nhật trạng thái trong Contacts
+        const updatedRequest = await Contacts.findOneAndUpdate(
+          {
+            userID: senderID,
+            contactID: recipientID,
+            status: "pending",
+          },
+          { status: "accepted" },
+          { new: true }
+        );
+    
+        if (!updatedRequest) {
+          callback?.({ success: false, message: "Không tìm thấy lời mời" });
+          return;
+        }
+    
+        // Tạo ngược lại để 2 chiều kết bạn
+        const reciprocal = await Contacts.findOne({
+          userID: recipientID,
+          contactID: senderID,
+        });
+    
+        if (!reciprocal) {
+          const reciprocalRequest = new Contacts({
+            userID: recipientID,
+            contactID: senderID,
+            alias: "Default Alias",
+            status: "accepted",
+          });
+          await reciprocalRequest.save();
+        } else if (reciprocal.status !== "accepted") {
+          reciprocal.status = "accepted";
+          await reciprocal.save();
+        }
+    
+        // Gửi real-time cho cả 2 bên
+        const senderUser = await Users.findOne({ userID: senderID });
+        const recipientUser = await Users.findOne({ userID: recipientID });
+    
+        const senderSocketId = users[senderUser?.sdt];
+        const recipientSocketId = users[recipientUser?.sdt];
+    
+        const acceptedData = {
+          senderID,
+          recipientID,
+          status: "accepted",
+          timestamp: Date.now(),
+        };
+    
+        if (senderSocketId) {
+          io.to(senderSocketId).emit("friend_request_accepted", acceptedData);
+        }
+    
+        if (recipientSocketId) {
+          io.to(recipientSocketId).emit("friend_request_accepted", acceptedData);
+        }
+    
+        callback?.({ success: true });
+      } catch (error) {
+        console.error("❌ Error accepting friend request:", error);
+        callback?.({ success: false, message: "Lỗi server" });
       }
     });
         
@@ -309,6 +419,58 @@ const socketHandler = (io) => {
           socket.emit("error", { message: "Lỗi khi lấy yêu cầu kết bạn" });
         }
       });
+
+    
+
+    socket.on("accept_friend_request", async ({ senderID, recipientID }) => {
+      try {
+        // Cập nhật trạng thái yêu cầu kết bạn trong database
+        const updatedRequest = await Contacts.findOneAndUpdate(
+          { userID: senderID, contactID: recipientID, status: "pending" },
+          { status: "accepted" },
+          { new: true }
+        );
+    
+        if (updatedRequest) {
+          // Phát sự kiện cho cả người gửi và người nhận
+          io.to(users[senderID]).emit("friend_request_accepted", { senderID, recipientID });
+          io.to(users[recipientID]).emit("friend_request_accepted", { senderID, recipientID });
+        }
+      } catch (error) {
+        console.error("❌ Error accepting friend request:", error);
+      }
+    });
+    
+    socket.on("reject_friend_request", async ({ senderID, recipientID }) => {
+      try {
+        // Xóa yêu cầu kết bạn trong database
+        const deletedRequest = await Contacts.findOneAndDelete({
+          userID: senderID,
+          contactID: recipientID,
+          status: "pending",
+        });
+    
+        if (deletedRequest) {
+          // Phát sự kiện từ chối yêu cầu cho cả người gửi và người nhận
+          io.to(users[senderID]).emit("friend_request_rejected", { senderID, recipientID });
+          io.to(users[recipientID]).emit("friend_request_rejected", { senderID, recipientID });
+        }
+      } catch (error) {
+        console.error("❌ Error rejecting friend request:", error);
+      }
+    });
+
+    // Lắng nghe sự kiện get_pending_friend_requests
+    socket.on("get_pending_friend_requests", async (userID) => {
+      try {
+        // Gọi controller để lấy danh sách yêu cầu kết bạn đang chờ
+        const friendRequests = await Controller.displayFriendRequest(userID);
+        socket.emit("pending_friend_requests", friendRequests); // Gửi lại thông tin yêu cầu kết bạn đang chờ
+      } catch (error) {
+        console.error("❌ Error fetching pending friend requests:", error);
+        socket.emit("error", { message: "Lỗi khi lấy yêu cầu kết bạn" });
+      }
+    });
 
     // Ngắt kết nối
     socket.on("disconnect", () => {

@@ -315,6 +315,225 @@ Controller.createChat = async (userID1,userID2)=>{
       
     }
 };
+Controller.createContact = async (userID,sdt )=>{
+  try{
+    if (userID === sdt) {
+      return null; // Không cho phép gửi yêu cầu kết bạn cho chính mình
+    }
+      // Tìm người dùng theo số điện thoại
+      const targetUser = await Users.findOne({ sdt: sdt });
+  
+      if (!targetUser) {
+          return null;
+      }
+  
+      // Kiểm tra xem yêu cầu kết bạn đã tồn tại chưa
+      const existingContact = await Contacts.findOne({
+          $or: [
+              { userID: userID, contactID: targetUser.userID }, // Kiểm tra yêu cầu từ userID đến contactID
+              { userID: targetUser.userID, contactID: userID }  // Kiểm tra yêu cầu ngược lại
+          ]
+      });
+  
+      if (existingContact) {
+          if (existingContact.status === 'pending') {
+              return null;
+          } else if (existingContact.status === 'accepted') {
+              return null
+          } else {
+              // Nếu trạng thái không phải là "pending" hay "accepted", chuyển trạng thái thành "pending"
+              existingContact.status = 'pending';
+              await existingContact.save();
+              return ({ message: 'Yêu cầu kết bạn đã được gửi lại!' });
+          }
+      }
+    
+      // Nếu không có yêu cầu kết bạn, tạo yêu cầu mới
+      const newContact = new Contacts({
+          contactID:userID,
+          userID: targetUser.userID,
+          alias: `${targetUser.name}`,
+          status: 'pending', // Trạng thái yêu cầu đang chờ
+          created_at: new Date(),
+      });
+    
+      await newContact.save();
+  
+    if (!newContact) {
+      console.error("Failed to save new contact request.");
+      return;
+    }
+    return newContact
+  }catch (error) {
+    console.error("Error creating contact:", error);
+    return;
+  }
+};
+// Hàm từ chối yêu cầu kết bạn
+Controller.rejectFriendRequest = async (req, res) => {
+    const { userID, contactID } = req.body;
+
+    try {
+        const contactRequest = await Contacts.findOneAndDelete({
+            userID: contactID,
+            contactID: userID,
+            status: 'pending'
+        });
+
+        if (!contactRequest) {
+            return res.status(404).json({ message: 'Không tìm thấy yêu cầu kết bạn để từ chối.' });
+        }
+
+        return res.status(200).json({ message: 'Yêu cầu kết bạn đã bị từ chối!' });
+    } catch (error) {
+        console.error('Lỗi khi từ chối yêu cầu kết bạn:', error);
+        return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+    }
+};
+
+// Tìm kiếm bạn bè theo số điện thoại
+Controller.searchFriendByPhone = async (req, res) => {
+    const { phoneNumber, userID } = req.body;
+
+    if (!phoneNumber || !userID) {
+        return res.status(400).json({ message: 'Số điện thoại và userID là bắt buộc!' });
+    }
+
+    const phoneRegex = /^(0[3,5,7,8,9])[0-9]{8}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+        return res.status(400).json({ message: 'Số điện thoại không hợp lệ!' });
+    }
+
+    try {
+        const currentUser = await Users.findOne({ userID });
+        if (currentUser && phoneNumber === currentUser.sdt) {
+            return res.status(200).json({
+                userID: currentUser.userID,
+                anhBia: currentUser.anhBia,
+                name: currentUser.name,
+                phoneNumber: currentUser.sdt,
+                avatar: currentUser.anhDaiDien,
+                friendStatus: "self"
+            });
+        }
+
+        const targetUser = await Users.findOne({ sdt: phoneNumber });
+
+        if (!targetUser) {
+            return res.status(404).json({ message: 'Không tìm thấy người dùng với số điện thoại này.' });
+        }
+
+        const existingContact = await Contacts.findOne({
+            $or: [
+                { userID: userID, contactID: targetUser.userID },
+                { userID: targetUser.userID, contactID: userID }
+            ]
+        });
+
+        let friendStatus = 'none';
+
+        if (existingContact) {
+            if (existingContact.status === 'pending') {
+                friendStatus = 'pending';
+            } else if (existingContact.status === 'accepted') {
+                friendStatus = 'accepted';
+            } else {
+                friendStatus = 'rejected';
+            }
+        }
+
+        res.status(200).json({
+            userID: targetUser.userID,
+            name: targetUser.name,
+            phoneNumber: targetUser.sdt,
+            friendStatus: friendStatus,
+            avatar: targetUser.anhDaiDien
+        });
+    } catch (error) {
+        console.error('Lỗi khi tìm kiếm người dùng:', error);
+        res.status(500).json({ message: 'Có lỗi xảy ra khi tìm kiếm người dùng.' });
+    }
+};
+Controller.acceptFriendRequest = async (req, res) => {
+    const { contactID, userID } = req.body;
+
+    if (!contactID || !userID) {
+        return res.status(400).json({ message: 'Thiếu thông tin contactID hoặc userID.' });
+    }
+
+    try {
+        const contactRequest = await Contacts.findOne({
+            userID: contactID,
+            contactID: userID,
+            status: 'pending'
+        });
+
+        if (!contactRequest) {
+            return res.status(404).json({ message: 'Không tìm thấy yêu cầu kết bạn để chấp nhận.' });
+        }
+
+        contactRequest.status = 'accepted';
+        await contactRequest.save();
+
+        await Contacts.updateOne(
+            { userID: userID, contactID: contactID, status: 'pending' },
+            { $set: { status: 'accepted' } }
+        );
+
+        return res.status(200).json({ message: 'Yêu cầu kết bạn đã được chấp nhận!' });
+    } catch (error) {
+        console.error('Lỗi khi chấp nhận yêu cầu kết bạn:', error);
+        return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+    }
+};
+Controller.displayFriendRequest = async (userID) => {
+  try {
+    if (!userID) {
+      throw new Error("userID không hợp lệ");
+    }
+
+    // Tìm các yêu cầu kết bạn đang chờ mà userID là người gửi hoặc người nhận
+    const pendingRequests = await Contacts.find({
+      $or: [
+        { contactID: userID },
+        { userID: userID }
+      ],
+      status: "pending",
+    }).exec();
+
+    if (pendingRequests.length === 0) {
+      return [];
+    }
+
+    const friendDetails = [];
+
+    for (let request of pendingRequests) {
+      // Xác định ai là người gửi (không phải user hiện tại)
+      const targetUserID = (request.contactID === userID) 
+        ? request.userID 
+        : request.contactID;
+
+      const senderUser = await Users.findOne({ userID: targetUserID })
+        .select("name anhDaiDien sdt")
+        .exec();
+
+      if (senderUser) {
+        friendDetails.push({
+          contactID: targetUserID,
+          name: senderUser.name,
+          avatar: senderUser.anhDaiDien,
+          phoneNumber: senderUser.sdt,
+          alias: request.alias,
+        });
+      }
+    }
+
+    return friendDetails;
+  } catch (error) {
+    console.error("❌ Error fetching pending friend requests:", error);
+    throw error;
+  }
+};
 
 
 module.exports = Controller;
