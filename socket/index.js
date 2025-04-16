@@ -3,7 +3,7 @@ const ChatMembers = require("../models/ChatMember");
 const Controller = require("../controller/index");
 const Contacts = require("../models/Contacts");
 const Users = require("../models/User");
-//const contactController = require("../controller/index");  // Import contactController
+
  
 
 const socketHandler = (io) => {
@@ -412,7 +412,7 @@ socket.on("send_friend_request", async (data) => {
       socket.on("get_pending_friend_requests", async (userID) => {
         try {
           // Gọi controller để lấy danh sách yêu cầu kết bạn đang chờ
-          const friendRequests = await contactController.displayFriendRequest(userID);
+          const friendRequests = await Controller.displayFriendRequest(userID);
           socket.emit("pending_friend_requests", friendRequests); // Gửi lại thông tin yêu cầu kết bạn đang chờ
         } catch (error) { 
           console.error("❌ Error fetching pending friend requests:", error);
