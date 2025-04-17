@@ -173,8 +173,8 @@ socket.on("send_friend_request", async (data) => {
   }); // Gửi yêu cầu kết bạn đến người nhận
   io.to(data.senderID).emit('friend_request_sent', {
     userID: data.recipientID,
-    name: targetUser.name,
-    avatar: targetUser.anhDaiDien
+    name: data.senderName,
+    avatar: data.senderImage
   });
   }catch (error) {
     console.error("❌ Error sending friend request:", error);

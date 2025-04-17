@@ -48,62 +48,141 @@ Controller.sendOtpEmail = async (recipientEmail, otp) => {
     console.error('Gửi OTP thất bại:', error);
   }
 };
+// Controller.getChatsForUser = async (userID) => {
+//   try {
+//     // 1. Lấy danh sách chatID từ chat_members
+//     const memberDocs = await ChatMembers.find({ userID }).lean();
+//     const chatIDs = memberDocs.map(m => m.chatID);
+//     // 2. Lấy thông tin chat tương ứng
+//     const chats = await Chats.find({ chatID: { $in: chatIDs } }).lean();
+//     // 3. Gắn thêm tin nhắn cuối cùng + thông tin người gửi
+//     for (let chat of chats) {
+//       const lastMsg = await messages.find({ chatID: chat.chatID })
+//         .sort({ timestamp: -1 })
+//         .lean();
+//       // Lấy toàn bộ senderID trong mảng lastMsg
+//       const senderIDs = lastMsg.map(msg => msg.senderID);
+//       const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
+//       // Map từng msg với sender
+//       const enrichedMessages = lastMsg.map(msg => {
+//         const sender = senders.find(u => u.userID === msg.senderID);
+//         return {
+//           ...msg,
+//           senderInfo: sender ? {
+//             name: sender.name,
+//             avatar: sender.anhDaiDien || null,
+//           } : null,
+//         };
+//       });
+
+//       chat.lastMessage = enrichedMessages;
+//     }
+
+//     console.log("Danh sách chat sau khi gán user cho tin nhắn cuối:", chats);
+//     return chats;
+//   } catch (error) {
+//     console.error("Lỗi khi lấy chat:", error);
+//     throw error;
+//   }
+// };
 Controller.getChatsForUser = async (userID) => {
   try {
-    // 1. Lấy danh sách chatID từ chat_members
-    const memberDocs = await ChatMembers.find({ userID }).lean();
+    // 1. Lấy tất cả chatID mà user tham gia từ ChatMembers
+    const memberDocs = await ChatMembers.find({ "members.userID": userID }).lean();  // Tìm kiếm theo "userID" trong mảng "members"
     const chatIDs = memberDocs.map(m => m.chatID);
-    // 2. Lấy thông tin chat tương ứng
+
+    if (chatIDs.length === 0) return [];
+
+    // 2. Lấy thông tin các cuộc chat
     const chats = await Chats.find({ chatID: { $in: chatIDs } }).lean();
-    // 3. Gắn thêm tin nhắn cuối cùng + thông tin người gửi
-    for (let chat of chats) {
-      const lastMsg = await messages.find({ chatID: chat.chatID })
-        .sort({ timestamp: -1 })
-        .lean();
-      // Lấy toàn bộ senderID trong mảng lastMsg
-      const senderIDs = lastMsg.map(msg => msg.senderID);
-      const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
-      // Map từng msg với sender
-      const enrichedMessages = lastMsg.map(msg => {
-        const sender = senders.find(u => u.userID === msg.senderID);
-        return {
-          ...msg,
-          senderInfo: sender ? {
-            name: sender.name,
-            avatar: sender.anhDaiDien || null,
-          } : null,
-        };
+
+    // 3. Lấy tất cả tin nhắn thuộc các cuộc chat
+    const allMessages = await messages.find({ chatID: { $in: chatIDs } })
+      .sort({ timestamp: 1 })
+      .lean();
+
+    // 4. Lấy toàn bộ sender info
+    const senderIDs = [...new Set(allMessages.map(m => m.senderID))];
+    const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
+
+    // 5. Gắn senderInfo vào mỗi tin nhắn
+    const enrichedMessages = allMessages.map(msg => {
+      const sender = senders.find(s => s.userID === msg.senderID);
+      return {
+        ...msg,
+        senderInfo: sender ? {
+          name: sender.name,
+          avatar: sender.anhDaiDien || null,
+        } : null,
+      };
+    });
+
+    // 6. Gom tin nhắn theo chatID
+    const messagesByChat = {};
+    enrichedMessages.forEach(msg => {
+      if (!messagesByChat[msg.chatID]) {
+        messagesByChat[msg.chatID] = [];
+      }
+      messagesByChat[msg.chatID].push(msg);
+    });
+
+    // 7. Lấy tất cả thành viên của các chat từ ChatMembers
+    const allMembers = await ChatMembers.find({ chatID: { $in: chatIDs } }).lean();
+
+    // 8. Gom member theo chatID
+    const membersByChat = {};
+    allMembers.forEach(member => {
+      if (!membersByChat[member.chatID]) {
+        membersByChat[member.chatID] = [];
+      }
+      
+      // Thêm thành viên vào danh sách
+      member.members.forEach(m => {
+        membersByChat[member.chatID].push({
+          userID: m.userID,
+          role: m.role,
+        });
       });
+    });
 
-      chat.lastMessage = enrichedMessages;
-    }
+    // 9. Gắn tin nhắn và members vào từng chat
+    const result = chats.map(chat => ({
+      ...chat,
+      lastMessage: messagesByChat[chat.chatID] || [], // Thêm tin nhắn vào mỗi chat
+      members: membersByChat[chat.chatID] || []    // Thêm thành viên vào mỗi chat
+    }));
 
-    console.log("Danh sách chat sau khi gán user cho tin nhắn cuối:", chats);
-    return chats;
+    return result;
+
   } catch (error) {
-    console.error("Lỗi khi lấy chat:", error);
+    console.error("Lỗi khi lấy danh sách chat và tin nhắn:", error);
     throw error;
   }
 };
+
+
+
 Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
   try {
     // 1. Lấy danh sách chatID mà người dùng đăng nhập tham gia
-    const memberDocs = await ChatMembers.find({ userID: loggedInUserID }).lean();
+    const memberDocs = await ChatMembers.find({ "members.userID": loggedInUserID }).lean();
     const chatIDs = memberDocs.map(m => m.chatID);
 
-    // 2. Tìm tất cả các chat private trong danh sách đó
-    const privateChats = await Chats.find({ 
+    // 2. Tìm tất cả các chat private trong danh sách chatIDs
+    const privateChats = await Chats.find({
       chatID: { $in: chatIDs },
       type: 'private'
     }).lean();
 
     let targetChat = null;
 
-    // 3. Duyệt từng chat để tìm chat chứa cả 2 người
+    // 3. Duyệt qua từng chat để tìm chat chứa cả 2 người
     for (const chat of privateChats) {
-      const members = await ChatMembers.find({ chatID: chat.chatID }).lean();
+      const members = chat.members; // Các thành viên của chat
       const hasUser1 = members.some(m => m.userID === loggedInUserID);
       const hasUser2 = members.some(m => m.userID === friendUserID);
+      
+      // Nếu chat chứa cả hai người dùng, lưu lại chat đó
       if (hasUser1 && hasUser2) {
         targetChat = chat;
         break;
@@ -119,8 +198,8 @@ Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
     // 5. Lấy toàn bộ tin nhắn trong chat
     const messagesList = await messages.find({ chatID: targetChat.chatID }).sort({ timestamp: 1 }).lean();
 
+    // Nếu không có tin nhắn nào, vẫn trả về chat với lastMessage là []
     if (messagesList.length === 0) {
-      // Không có tin nhắn nào nhưng vẫn trả về chat với lastMessage là []
       targetChat.lastMessage = [];
       return targetChat;
     }
@@ -129,6 +208,7 @@ Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
     const senderIDs = messagesList.map(msg => msg.senderID);
     const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
 
+    // 7. Gắn thông tin người gửi vào mỗi tin nhắn
     const enrichedMessages = messagesList.map(msg => {
       const sender = senders.find(u => u.userID === msg.senderID);
       return {
@@ -140,6 +220,7 @@ Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
       };
     });
 
+    // 8. Gán tin nhắn cuối cùng vào chat
     targetChat.lastMessage = enrichedMessages;
     return targetChat;
 
@@ -148,6 +229,7 @@ Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
     throw error;
   }
 };
+
 
 Controller.getCreatMessageByChatID = async (newMsg)=>{
   try {
@@ -248,7 +330,7 @@ Controller.getContactsByUserID = async (userID) => {
     const friends = await Users.find({ userID: { $in: friendIDs } })
       .select('userID anhDaiDien sdt email name trangThai') // chọn các trường bạn cần
       .exec();
-
+    console.log("Danh sách bạn bè:", friends);
     return friends;
   } catch (error) {
     console.error('Lỗi khi lấy danh sách bạn bè:', error);
@@ -492,48 +574,75 @@ Controller.displayFriendRequest = async (userID) => {
       throw new Error("userID không hợp lệ");
     }
 
-    // Tìm các yêu cầu kết bạn đang chờ mà userID là người gửi hoặc người nhận
+    // Lấy tất cả yêu cầu kết bạn liên quan đến userID (gửi hoặc nhận)
     const pendingRequests = await Contacts.find({
       $or: [
-        { contactID: userID },
-        { userID: userID }
+        { contactID: userID }, // userID là người gửi
+        { userID: userID }     // userID là người nhận
       ],
       status: "pending",
     }).exec();
 
     if (pendingRequests.length === 0) {
-      return [];
+      return {
+        sentRequests: [],
+        receivedRequests: [],
+      };
     }
 
-    const friendDetails = [];
+    const sentRequests = [];
+    const receivedRequests = [];
 
     for (let request of pendingRequests) {
-      // Xác định ai là người gửi (không phải user hiện tại)
-      const targetUserID = (request.contactID === userID) 
-        ? request.userID 
-        : request.contactID;
+      if (request.contactID === userID) {
+        // userID là người gửi
+        const receiverID = request.userID;
 
-      const senderUser = await Users.findOne({ userID: targetUserID })
-        .select("name anhDaiDien sdt")
-        .exec();
+        const receiver = await Users.findOne({ userID: receiverID })
+          .select("name anhDaiDien sdt")
+          .exec();
 
-      if (senderUser) {
-        friendDetails.push({
-          contactID: targetUserID,
-          name: senderUser.name,
-          avatar: senderUser.anhDaiDien,
-          phoneNumber: senderUser.sdt,
-          alias: request.alias,
-        });
+        if (receiver) {
+          sentRequests.push({
+            contactID:userID,
+            userID: receiverID,
+            name: receiver.name,
+            phoneNumber: receiver.sdt,
+            avatar: receiver.anhDaiDien,
+            alias: request.alias,
+          });
+        }
+      } else if (request.userID === userID) {
+        // userID là người nhận
+        const senderID = request.contactID;
+
+        const sender = await Users.findOne({ userID: senderID })
+          .select("name anhDaiDien sdt")
+          .exec();
+
+        if (sender) {
+          receivedRequests.push({
+            contactID: senderID,
+            userID:userID,
+            name: sender.name,
+            phoneNumber: sender.sdt,
+            avatar: sender.anhDaiDien,
+            alias: request.alias,
+          });
+        }
       }
     }
 
-    return friendDetails;
+    return {
+      sentRequests,
+      receivedRequests,
+    };
   } catch (error) {
     console.error("❌ Error fetching pending friend requests:", error);
     throw error;
   }
 };
+
 
 
 module.exports = Controller;

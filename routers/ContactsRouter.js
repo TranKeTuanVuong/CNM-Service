@@ -2,17 +2,18 @@
 const express = require("express");
 const router = express.Router();
 const bodyParser = require('body-parser');
-const contactController = require("../controller/index");
+const Controller = require("../controller/index");
+const Contacts = require("../models/Contacts");
 
 router.use(bodyParser.json());
 
 // Các API sử dụng controller
 // router.post('/send-friend-request', contactController.sendFriendRequest);
- router.post('/accept-friend-request', contactController.acceptFriendRequest);
- router.post('/reject-friend-request', contactController.rejectFriendRequest);
+ router.post('/accept-friend-request', Controller.acceptFriendRequest);
+ router.post('/reject-friend-request', Controller.rejectFriendRequest);
 // router.get('/friends/:userID', contactController.getFriends);
- router.post('/search-friend-by-phone', contactController.searchFriendByPhone);
- router.get('/display-friend-request/:userID', contactController.displayFriendRequest);
+ router.post('/search-friend-by-phone', Controller.searchFriendByPhone);
+ router.get('/display-friend-request/:userID', Controller.displayFriendRequest);
 
 
   
@@ -247,17 +248,27 @@ router.get('/display-friend-request/:userID', async (req, res) => {
  });
 
  router.post('/ContacsFriendByUserID', async (req, res) => {
-      try {
-      const  {userID} = req.body;
-        const contacts = await Controller.getContactsByUserID(userID);
-        if (!contacts) {
-          return res.status(404).json({ message: 'Không tìm thấy danh bạ!' });
-        }
-        res.status(200).json(contacts);
-      } catch (error) {
-        return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
-      }
- });
+  try {
+    const { userID } = req.body;
+
+    console.log("📥 Nhận userID từ client:", userID);
+
+    const contacts = await Controller.getContactsByUserID(userID);
+
+    if (!contacts) {
+      console.warn("⚠️ Không tìm thấy danh bạ cho userID:", userID);
+      return res.status(404).json({ message: 'Không tìm thấy danh bạ!' });
+    }
+   console.log(contacts);
+    res.status(200).json(contacts);
+
+  } catch (error) {
+    console.error("❌ Lỗi trong route ContacsFriendByUserID:", error.message);
+    console.error(error.stack); // Log stack trace giúp xác định dòng bị lỗi
+    return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+  }
+});
+
 module.exports = router;  
 
 
