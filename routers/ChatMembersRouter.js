@@ -26,7 +26,7 @@ try {
 router.post("/chatmemberBychatID&userID", async (req, res) => {
   try {
       const {userID,chatID} = req.body;
-      const chatmember = await ChatMembers.findOne({userID: userID,chatID: chatID });
+      const chatmember = await ChatMembers.findOne({"members.userID": userID,chatID: chatID });
       if (!chatmember) {
           return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện!" });
       }
