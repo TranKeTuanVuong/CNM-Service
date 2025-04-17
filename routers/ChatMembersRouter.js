@@ -30,7 +30,12 @@ router.post("/chatmemberBychatID&userID", async (req, res) => {
       if (!chatmember) {
           return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện!" });
       }
-      const user = await Controller.getUserByID(chatmember.memberID);
+      const memberIDs = chatmember.members
+      .filter(member => member.role === 'member')
+      .map(member => member.userID);
+  
+      console.log(memberIDs);
+      const user = await Controller.getUserByID(memberIDs);
       res.status(200).json(user);
   } catch (error) {
       res.status(500).json({ error: error.message });
