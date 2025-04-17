@@ -31,7 +31,7 @@ router.post("/chatmemberBychatID&userID", async (req, res) => {
           return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện!" });
       }
       const memberIDs = chatmember.members
-      .filter(member => member.role === 'member')
+      .filter(member => member.userID !== userID)
       .map(member => member.userID);
   
       console.log(memberIDs);
