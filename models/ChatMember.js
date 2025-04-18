@@ -11,6 +11,6 @@ const ChatMemberschema = new mongoose.Schema({
 }, {
   versionKey: false
 });
-const Chats = mongoose.model("ChatMembers", ChatMemberschema,"ChatMembers");
+const ChatMembers = mongoose.model("ChatMembers", ChatMemberschema,"ChatMembers");
   
-module.exports = Chats;
+module.exports = ChatMembers;

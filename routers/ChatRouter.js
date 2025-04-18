@@ -70,9 +70,7 @@ router.post('/createChat1-1', async (req, res) => {
     const chat = await Controller.createChat(userID1, userID2);
     console.log('Tạo cuộc trò chuyện thành công:', chat);
     if(chat){
-      const chats = await Controller.getOneOnOneChat(userID1,userID2);
-      console.log('Tạo cuộc trò chuyện thành công:', chats);
-      res.status(200).json(chats);
+      res.status(200).json(chat);
     }
   }catch(error){
     console.error('Lỗi khi tạo cuộc trò chuyện:', error);

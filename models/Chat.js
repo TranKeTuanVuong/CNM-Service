@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const Chatchema = new mongoose.Schema({
-    chatID: { type: String, unique: true, required: true },
+    chatID: { type: String, required: true },
     type: { type: String, required: true },
     name: { type: String, required: true },
     created_at: { type: Date, default: Date.now },

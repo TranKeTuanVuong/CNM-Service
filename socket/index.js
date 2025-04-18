@@ -32,19 +32,14 @@ const socketHandler = (io) => {
     // Tham gia phòng chat 1-1
     socket.on('createChat1-1', async (data) => {
       try {
+        console.log("Tạo cuộc trò chuyện 1-1:", data);
         if (!data?.chatID) {
           console.error("❌ Không có chatID trong data");
           return;
         }
     
-        const chatmembers = await ChatMembers.find({ chatID: data.chatID });
-    
-        if (!chatmembers.length) {
-          console.log("⚠️ Không tìm thấy thành viên trong chat:", data.chatID);
-          return;
-        }
-    
-        chatmembers.forEach((member) => {
+        
+          data.members.forEach((member) => {
           io.to(member.userID).emit("newChat1-1", { data });
           console.log(`📤 Gửi newChat1-1 đến user ${member.userID}`);
         });
@@ -276,24 +271,23 @@ socket.on("send_friend_request", async (data) => {
           return;
         }
 
-        message.isUnsent = true;
+        message.type = "unsend";
         message.content = "";
         message.media_url = [];
         await message.save();
 
-        const unsentData = {
-          messageID,
-          chatID,
-          senderID,
-          isUnsent: true,
-          timestamp: Date.now(),
-        };
+        if (!message) {
+          console.error("❌ Message not found:", messageID);
+          return;
+        }
 
-        io.to(chatID).emit("unsend_notification", unsentData);
+        io.to(chatID).emit("unsend_notification", message);
 
         const members = await ChatMembers.find({ chatID });
         members.forEach((m) => {
-          io.to(m.userID).emit("unsend_notification", unsentData);
+          m.members.forEach((member) => {
+            io.to(member.userID).emit("unsend_notification", message);
+          });
         });
 
         console.log("❌ Message unsent:", messageID);
@@ -370,24 +364,41 @@ socket.on("send_friend_request", async (data) => {
       }
     });
   // Lắng nghe sự kiện accept_friend_request
-    socket.on("accept_friend_request", async ({ senderID, recipientID }) => {
-      try {
-        // Cập nhật trạng thái yêu cầu kết bạn trong database
-        const updatedRequest = await Contacts.findOneAndUpdate(
-          { userID: senderID, contactID: recipientID, status: "pending" },
-          { status: "accepted" },
-          { new: true }
-        );
-    
-        if (updatedRequest) {
-          // Phát sự kiện cho cả người gửi và người nhận
-          io.to(users[senderID]).emit("friend_request_accepted", { senderID, recipientID });
-          io.to(users[recipientID]).emit("friend_request_accepted", { senderID, recipientID });
-          }
-        } catch (error) {
-          console.error("❌ Error accepting friend request:", error);
-        }
-      });
+  socket.on("accept_friend_request", async ({ senderID, recipientID, senderName, senderImage }) => {
+    try {
+      // 1. Cập nhật trạng thái yêu cầu từ sender → recipient
+      const updatedRequest = await Contacts.findOneAndUpdate(
+        { userID:recipientID , contactID: senderID, status: "pending" },
+        { status: "accepted" },
+        { new: true }
+      );
+  
+  
+      // 3. Lấy thông tin người nhận (để gửi lại qua socket)
+      const userRecipient = await Users.findOne({ userID: recipientID });
+       console.log("userRecipient",userRecipient);
+      if (updatedRequest && userRecipient) {
+        // 4. Emit tới người gửi
+        io.to(recipientID).emit("friend_request_accepted", {
+          userID:senderID,
+          name:senderName,
+          anhDaiDien:senderImage,
+          status: "accepted",
+        });
+  
+        // 5. Emit nguoi nhan
+        io.to(senderID).emit("friend_request_accepted", {
+          recipientID,
+          name: userRecipient.name,
+          avatar: userRecipient.anhDaiDien,
+          status: "accepted",
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error accepting friend request:", error);
+    }
+  });
+  
       
       socket.on("reject_friend_request", async ({ senderID, recipientID }) => {
         try {
