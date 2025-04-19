@@ -606,6 +606,63 @@ Controller.displayFriendRequest = async (userID) => {
     throw error;
   }
 };
+Controller.createChatGroup = async (data)=>{
+  try{
+    const lastChat = await Chats.findOne().sort({ chatID: -1 }).limit(1);
+    let chatID = '';
+
+    if (!lastChat || !lastChat.chatID) {
+      chatID = 'chat001';
+    } else {
+      const lastNumber = parseInt(lastChat.chatID.replace('chat', ''), 10);
+      const newNumber = lastNumber + 1;
+      chatID = `chat${newNumber.toString().padStart(3, '0')}`;
+    }
+
+    const newGroupChat = new Chats({
+      chatID: chatID,
+      type: 'group',
+    //image: data.image || null,
+      name: data.name,
+      created_at: Date.now(),
+    });
+
+    const saveGroupChat = await newGroupChat.save();
+    if (!saveGroupChat) return null;
+    const members = [];
+    const adminUser = {userID: data.adminID, role: 'admin'};
+        members.push(adminUser); // Thêm admin vào danh sách thành viên
+
+      data.members.map(member => (members.push({
+      userID: member.userID,
+      role:'member' // Mặc định là 'member' nếu không có role
+    })));
+
+    const groupMember = new ChatMembers({
+      chatID: chatID,
+       members: members
+    });
+    
+    await groupMember.save();
+
+    if (!groupMember) return null;
+
+    // ✅ Lấy lại chat + members để trả về
+    const createdGroupChat = await Chats.findOne({ chatID }).lean();
+    
+    return {
+      ...createdGroupChat,
+      lastMessage: [],
+      members: members
+    };
+
+  }catch (error) {
+    console.error("Lỗi khi tạo nhóm:", error);
+    return null;
+  }
+
+
+};
 
 
 

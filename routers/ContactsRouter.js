@@ -4,6 +4,7 @@ const router = express.Router();
 const bodyParser = require('body-parser');
 const Controller = require("../controller/index");
 const Contacts = require("../models/Contacts");
+const Users = require("../models/User");
 
 router.use(bodyParser.json());
 
@@ -11,7 +12,7 @@ router.use(bodyParser.json());
 // router.post('/send-friend-request', contactController.sendFriendRequest);
  router.post('/accept-friend-request', Controller.acceptFriendRequest);
  router.post('/reject-friend-request', Controller.rejectFriendRequest);
-// router.get('/friends/:userID', contactController.getFriends);
+ //router.get('/friends/:userID', contactController.getFriends);
  router.post('/search-friend-by-phone', Controller.searchFriendByPhone);
  router.get('/display-friend-request/:userID', Controller.displayFriendRequest);
 
@@ -108,9 +109,8 @@ router.use(bodyParser.json());
   
       // Duyệt qua danh sách bạn bè
       for (let friend of friends) {
-        // Tìm thông tin người dùng tương ứng với userID và contactID
         const user = await Users.findOne({ userID: friend.userID === userID ? friend.contactID : friend.userID })
-          .select('name sdt anhDaiDien anhBia') // Chọn trường name, sdt, anhDaiDien, anhBia
+          .select('name sdt anhDaiDien anhBia') // Chọn các trường cần thiết
           .exec();
   
         if (user) {
@@ -122,15 +122,14 @@ router.use(bodyParser.json());
           });
         }
       }
-
-     // Trả về danh sách bạn bè
-     res.json(friendDetails);
+  
+      // Trả về danh sách bạn bè
+      res.json(friendDetails);
     } catch (error) {
       console.error('Lỗi khi lấy danh sách bạn bè:', error);
       res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
     }
   });
-  
   
   router.post('/search-friend-by-phone', async (req, res) => {
     const { phoneNumber, userID } = req.body; // Lấy số điện thoại và userID từ yêu cầu

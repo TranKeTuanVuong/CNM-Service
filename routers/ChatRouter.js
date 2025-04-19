@@ -77,4 +77,17 @@ router.post('/createChat1-1', async (req, res) => {
     res.status(500).json({ message: 'Lỗi server khi tạo cuộc trò chuyện' });
   }
 });
+router.post('/createGroupChat', async (req, res) => {
+  try {
+    const { data} = req.body;
+    const chat = await Controller.createChatGroup(data);
+    console.log('Tạo cuộc trò chuyện thành công:', chat);
+    if(chat){
+      res.status(200).json(chat);
+    }
+  } catch (error) {
+    console.error('Lỗi khi tạo cuộc trò chuyện:', error);
+    res.status(500).json({ message: 'Lỗi server khi tạo cuộc trò chuyện' });
+  }
+});
 module.exports = router;

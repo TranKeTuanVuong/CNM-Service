@@ -11,15 +11,36 @@ function bufferToStream(buffer) {
 
 // Danh sách định dạng được chấp nhận
 const FILE_TYPE_MATCH = {
-  image: ["image/png", "image/jpeg", "image/jpg", "image/gif"],
+  image: ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"],
   video: ["video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"],
   audio: [
     "audio/mpeg",   // .mp3
     "audio/wav",
     "audio/webm",
     "audio/ogg"
+  ],
+  document: [
+    "application/pdf",
+    "application/msword", // .doc
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+    "application/vnd.ms-excel", // .xls
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+    "application/vnd.ms-powerpoint", // .ppt
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation" // .pptx
+  ],
+  archive: [
+    "application/zip",
+    "application/x-rar-compressed",
+    "application/x-7z-compressed",
+    "application/x-tar"
+  ],
+  text: [
+    "text/plain",
+    "text/csv",
+    "application/json"
   ]
 };
+
 
 function randomString(length = 6) {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -35,6 +56,12 @@ async function uploadToCloudinary(file) {
     fileType = "image";
   } else if (FILE_TYPE_MATCH.video.includes(file.mimetype)) {
     fileType = "video";
+  } else if (FILE_TYPE_MATCH.document.includes(file.mimetype)) {
+    fileType = "document";
+  } else if (FILE_TYPE_MATCH.archive.includes(file.mimetype)) {
+    fileType = "archive";
+  } else if (FILE_TYPE_MATCH.text.includes(file.mimetype)) {
+    fileType = "text";
   } else {
     throw new Error(`${file.originalname} is not a supported file format`);
   }
@@ -44,12 +71,7 @@ async function uploadToCloudinary(file) {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
-        folder:
-          fileType === "image"
-            ? "AnhChat"
-            : fileType === "video"
-            ? "VideoChat"
-            : "AudioChat",
+        folder: getUploadFolder(fileType),
         public_id: publicId,
         resource_type: "auto",
       },
@@ -65,6 +87,27 @@ async function uploadToCloudinary(file) {
     bufferToStream(file.buffer).pipe(uploadStream);
   });
 }
+
+// Folder mapping helper
+function getUploadFolder(fileType) {
+  switch (fileType) {
+    case "image":
+      return "AnhChat";
+    case "video":
+      return "VideoChat";
+    case "audio":
+      return "AudioChat";
+    case "document":
+      return "TaiLieuChat";
+    case "archive":
+      return "FileNenChat";
+    case "text":
+      return "TextChat";
+    default:
+      return "Khac";
+  }
+}
+
 
 
 module.exports = uploadToCloudinary;
