@@ -9,9 +9,6 @@ npm install socket.io
 npm install fluent-ffmpeg ffmpeg-static
 
 
-
-
-
 Vercel là một nền tảng deploy (triển khai) ứng dụng web cực kỳ dễ dùng – đặc biệt dành cho:
 
 Frontend frameworks như React, Next.js, Vue, Svelte

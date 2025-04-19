@@ -664,6 +664,256 @@ Controller.createChatGroup = async (data)=>{
 
 };
 
+Controller.addMembersToGroup = async (chatID, memberID) => {
+  try {
+    // Tìm chat theo chatID
+    const memberChat = await ChatMembers.findOne({ chatID: chatID });
+
+    if (!memberChat) {
+      console.log("Không tìm thấy nhóm.");
+      return null; // Nếu không tìm thấy nhóm, trả về null
+    }
+
+    // Kiểm tra xem memberID đã có trong mảng members hay chưa
+    const memberExists = memberChat.members.some(member => member.userID === memberID);
+
+    if (memberExists) {
+      console.log("Thành viên đã có trong nhóm.");
+      return { error: "Thành viên đã có trong nhóm." };
+    }
+
+    // Thêm memberID vào danh sách thành viên của chat, tránh trùng lặp
+    const chatMembers = await ChatMembers.updateOne(
+      { chatID: chatID },
+      { $addToSet: { members: { userID: memberID, role: "member" } } } // Thêm vào mảng members, tránh trùng lặp
+    );
+
+    if (chatMembers.modifiedCount === 0) {
+      console.log("Không có thành viên nào được thêm.");
+      return null;
+    }
+
+    // Lấy thông tin chat để đảm bảo rằng chatID tồn tại
+    const chat = await Chats.findOne({ chatID: chatID });
+    if (!chat) {
+      console.log("Chat không tồn tại.");
+      return null;
+    }
+
+    // Lấy lại thông tin các thành viên sau khi cập nhật
+    const newMember = await ChatMembers.findOne({ chatID: chatID });
+    if (!newMember) {
+      console.log("Không tìm thấy thành viên mới.");
+      return null;
+    }
+
+    // Lấy tất cả các tin nhắn của chat
+    const lastMessage = await messages.find({ chatID: chatID }).lean();
+
+    // Kiểm tra nếu không có tin nhắn trong chat
+    if (lastMessage.length === 0) {
+      console.log("Không có tin nhắn nào trong chat.");
+    }
+
+    // Trả về thông tin chat, tin nhắn mới (nếu có) và danh sách thành viên
+    return {
+      ...chat.toObject(),
+      lastMessage: lastMessage,
+      members: newMember.members
+    };
+  } catch (error) {
+    console.error("Đã xảy ra lỗi:", error);
+    return null;
+  }
+};
+
+Controller.removeMemberFromGroup = async (chatID, adminID, memberID) => {
+  try {
+    // Tìm nhóm (chat) theo chatID
+    const memberChat = await ChatMembers.findOne({ chatID: chatID });
+
+    if (!memberChat) {
+      console.log("Không tìm thấy nhóm.");
+      return { error: "Không tìm thấy nhóm." }; // Trả về lỗi nếu không tìm thấy nhóm
+    }
+
+    // Kiểm tra nếu adminID có quyền 'admin' trong nhóm
+    const adminMember = memberChat.members.find(member => member.userID === adminID && member.role === 'admin');
+
+    if (!adminMember) {
+      console.log("Chỉ admin mới có quyền xóa thành viên.");
+      return { error: "Chỉ admin mới có quyền xóa thành viên." }; // Nếu không phải admin, trả về lỗi
+    }
+
+    // Kiểm tra xem memberID có trong mảng members hay không
+    const memberIndex = memberChat.members.findIndex(member => member.userID === memberID);
+
+    if (memberIndex === -1) {
+      console.log("Thành viên không tồn tại trong nhóm.");
+      return { error: "Thành viên không tồn tại trong nhóm." }; // Nếu không tìm thấy thành viên, trả về lỗi
+    }
+
+    // Xóa thành viên khỏi mảng members
+    memberChat.members.splice(memberIndex, 1);
+
+    // Lưu thay đổi vào cơ sở dữ liệu
+    await memberChat.save();
+
+    console.log("Thành viên đã được xóa khỏi nhóm.");
+    return memberChat; // Trả về nhóm sau khi xóa thành viên
+  } catch (error) {
+    console.error("Lỗi khi xóa thành viên:", error);
+    return { error: error.message };
+  }
+};
+
+Controller.userRemoveFromGroup = async (chatID, memberID) => {
+  try {
+    // Tìm nhóm theo chatID
+    const memberChat = await ChatMembers.findOne({ chatID: chatID });
+
+    if (!memberChat) {
+      console.log("Không tìm thấy nhóm.");
+      return { error: "Không tìm thấy nhóm." }; // Nếu không tìm thấy nhóm
+    }
+
+    // Kiểm tra xem memberID có trong mảng members hay không
+    const memberIndex = memberChat.members.findIndex(member => member.userID === memberID);
+
+    if (memberIndex === -1) {
+      console.log("Thành viên không tồn tại trong nhóm.");
+      return { error: "Thành viên không tồn tại trong nhóm." }; // Nếu không tìm thấy thành viên
+    }
+
+    // Xóa thành viên khỏi mảng members
+    memberChat.members.splice(memberIndex, 1);
+
+    // Lưu thay đổi vào cơ sở dữ liệu
+    await memberChat.save();
+
+    console.log("Thành viên đã rời nhóm.");
+    return memberChat; // Trả về thông tin nhóm sau khi đã xóa thành viên
+  } catch (error) {
+    console.error("Lỗi khi rời nhóm:", error);
+    return { error: error.message };
+  }
+};
+
+Controller.changeMemberRole = async (chatID, adminID, memberID, newRole) => {
+  try {
+    // Tìm nhóm (chat) theo chatID
+    const memberChat = await ChatMembers.findOne({ chatID: chatID });
+
+    if (!memberChat) {
+      console.log("Không tìm thấy nhóm.");
+      return { error: "Không tìm thấy nhóm." }; // Trả về lỗi nếu không tìm thấy nhóm
+    }
+
+    // Kiểm tra nếu adminID có quyền 'admin' trong nhóm
+    const adminMember = memberChat.members.find(member => member.userID === adminID && member.role === 'admin');
+
+    if (!adminMember) {
+      console.log("Chỉ admin mới có quyền thay đổi quyền của thành viên.");
+      return { error: "Chỉ admin mới có quyền thay đổi quyền của thành viên." }; // Nếu không phải admin, trả về lỗi
+    }
+
+    // Kiểm tra xem memberID có trong mảng members hay không
+    const memberIndex = memberChat.members.findIndex(member => member.userID === memberID);
+
+    if (memberIndex === -1) {
+      console.log("Thành viên không tồn tại trong nhóm.");
+      return { error: "Thành viên không tồn tại trong nhóm." }; // Nếu không tìm thấy thành viên, trả về lỗi
+    }
+
+    // Thay đổi role của thành viên
+    memberChat.members[memberIndex].role = newRole;
+
+    // Lưu thay đổi vào cơ sở dữ liệu
+    await memberChat.save();
+
+    console.log(`Quyền của thành viên ${memberID} đã được thay đổi thành ${newRole}.`);
+    return memberChat; // Trả về nhóm sau khi thay đổi quyền
+  } catch (error) {
+    console.error("Lỗi khi phân quyền:", error);
+    return { error: error.message };
+  }
+};
+
+Controller.transferRole = async (chatID, adminID, memberID) => {
+  try {
+    // Tìm nhóm (chat) theo chatID
+    const memberChat = await ChatMembers.findOne({ chatID: chatID });
+
+    if (!memberChat) {
+      console.log("Không tìm thấy nhóm.");
+      return { error: "Không tìm thấy nhóm." }; // Nếu không tìm thấy nhóm
+    }
+
+    // Kiểm tra nếu adminID có quyền 'admin' trong nhóm
+    const adminMember = memberChat.members.find(member => member.userID === adminID && member.role === 'admin');
+
+    if (!adminMember) {
+      console.log("Chỉ admin mới có quyền thay đổi quyền của thành viên.");
+      return { error: "Chỉ admin mới có quyền thay đổi quyền của thành viên." }; // Nếu không phải admin, trả về lỗi
+    }
+
+    // Kiểm tra xem memberID có trong mảng members hay không
+    const memberIndex = memberChat.members.findIndex(member => member.userID === memberID);
+
+    if (memberIndex === -1) {
+      console.log("Thành viên không tồn tại trong nhóm.");
+      return { error: "Thành viên không tồn tại trong nhóm." }; // Nếu không tìm thấy thành viên
+    }
+
+    // Kiểm tra quyền hiện tại của thành viên (đảm bảo là 'member')
+    if (memberChat.members[memberIndex].role === 'admin') {
+      console.log("Không thể thay đổi quyền nếu thành viên là admin.");
+      return { error: "Không thể thay đổi quyền nếu thành viên là admin." }; // Không thể thay đổi nếu thành viên đã là admin
+    }
+
+    // Cập nhật quyền của thành viên và admin
+    // Thành viên trở thành admin, admin trở thành member
+    memberChat.members[memberIndex].role = 'admin';
+    adminMember.role = 'member';
+
+    // Lưu thay đổi vào cơ sở dữ liệu
+    await memberChat.save();
+
+    console.log(`Quyền của thành viên ${memberID} và admin ${adminID} đã được thay đổi.`);
+    return memberChat; // Trả về nhóm sau khi thay đổi quyền
+  } catch (error) {
+    console.error("Lỗi khi phân quyền:", error);
+    return { error: error.message };
+  }
+};
+
+Controller.deleteGroupAndMessages = async (chatID) => {
+  try {
+    // Tìm nhóm (chat) theo chatID trong ChatMembers
+    const memberChat = await ChatMembers.findOne({ chatID: chatID });
+
+    if (!memberChat) {
+      console.log("Không tìm thấy nhóm.");
+      return { error: "Không tìm thấy nhóm." }; // Nếu không tìm thấy nhóm
+    }
+
+    // Xóa nhóm trong ChatMembers
+    await ChatMembers.deleteOne({ chatID: chatID });
+
+    // Xóa nhóm trong Chats
+    await Chats.deleteOne({ chatID: chatID });
+
+    // Xóa tất cả tin nhắn liên quan đến chatID
+    await messages.deleteMany({ chatID: chatID });
+
+    console.log(`Nhóm ${chatID} đã được giải tán và xóa hoàn toàn.`);
+    return { message: `Nhóm ${chatID} đã được giải tán và xóa hoàn toàn.` };
+  } catch (error) {
+    console.error("Lỗi khi giải tán nhóm và xóa tin nhắn:", error);
+    return { error: error.message };
+  }
+};
+
 
 
 module.exports = Controller;
