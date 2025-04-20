@@ -41,5 +41,19 @@ router.post("/chatmemberBychatID&userID", async (req, res) => {
       res.status(500).json({ error: error.message });
   }
   });
+  
+  router.post("/InforMember", async (req, res) => {
+    try {
+        const {members} = req.body;
+        const membersInfor = await Controller.getInforMember(members);
+        if (!membersInfor) {
+            return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện!" });
+        }
+        res.status(200).json(membersInfor);
+    }catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 module.exports = router;

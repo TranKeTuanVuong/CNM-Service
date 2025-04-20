@@ -622,7 +622,7 @@ Controller.createChatGroup = async (data)=>{
     const newGroupChat = new Chats({
       chatID: chatID,
       type: 'group',
-    //image: data.image || null,
+      avatar: "https://res.cloudinary.com/dgqppqcbd/image/upload/v1741595806/anh-dai-dien-hai-2_isr0gd.jpg",
       name: data.name,
       created_at: Date.now(),
     });
@@ -661,8 +661,36 @@ Controller.createChatGroup = async (data)=>{
     return null;
   }
 
-
 };
+Controller.getInforMember = async (members) => {
+  try {
+    const users = await Promise.all(
+      members.map(async (member) => {
+        const user = await Users.findOne({ userID: member.userID });
+        if (user) {
+          return {
+            userID: user.userID,
+            name: user.name,
+            avatar: user.anhDaiDien,
+            sdt: user.sdt
+          };
+        } else {
+          return null;
+        }
+      })
+    );
+
+    // Lọc bỏ các kết quả null nếu cần
+    return users.filter(Boolean);
+  } catch (error) {
+    console.error("❌ Lỗi khi lấy thông tin thành viên:", error);
+    return null;
+  }
+};
+
+
+
+
 
 
 
