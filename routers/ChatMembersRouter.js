@@ -41,7 +41,6 @@ router.post("/chatmemberBychatID&userID", async (req, res) => {
       res.status(500).json({ error: error.message });
   }
   });
-<<<<<<< HEAD
   
   router.post("/InforMember", async (req, res) => {
     try {
@@ -56,7 +55,6 @@ router.post("/chatmemberBychatID&userID", async (req, res) => {
     }
 });
 
-=======
   router.post("/addMemberGroup", async (req, res) => {
     try {
       const { chatID, memberIDs } = req.body;  // Sử dụng mảng memberIDs thay vì một memberID duy nhất
@@ -86,7 +84,6 @@ router.post("/chatmemberBychatID&userID", async (req, res) => {
     }
   });
   
->>>>>>> 469380a7304fccca3e7e7d903431a40b75044aba
 
   router.post("/removeMemberFromGroup", async (req, res) => {
     try {
