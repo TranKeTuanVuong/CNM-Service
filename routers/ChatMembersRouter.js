@@ -41,20 +41,18 @@ router.post("/chatmemberBychatID&userID", async (req, res) => {
       res.status(500).json({ error: error.message });
   }
   });
-
   router.post("/addMemberGroup", async (req, res) => {
     try {
-      const { chatID, memberID } = req.body;
-      console.log(chatID, memberID);
-  
-      // Gọi Controller để thêm thành viên vào nhóm
-      const chat = await Controller.addMembersToGroup(chatID, memberID);
-  
-      // Kiểm tra nếu controller trả về lỗi về thành viên đã tồn tại
-      if (chat && chat.error) {
-        return res.status(400).json({ message: chat.error }); // Trả về lỗi nếu thành viên đã có trong nhóm
+      const { chatID, memberIDs } = req.body;  // Sử dụng mảng memberIDs thay vì một memberID duy nhất
+      console.log("Chat ID:", chatID, "Member IDs:", memberIDs);
+    
+      if (!Array.isArray(memberIDs)) {
+        return res.status(400).json({ message: "memberIDs phải là một mảng!" });
       }
   
+      // Gọi Controller để thêm các thành viên vào nhóm
+      const chat = await Controller.addMembersToGroup(chatID, memberIDs);
+    
       // Nếu không tìm thấy chat hoặc không thêm thành viên
       if (!chat) {
         return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện!" });
@@ -62,7 +60,7 @@ router.post("/chatmemberBychatID&userID", async (req, res) => {
   
       // Nếu thành công, trả về thông tin nhóm đã được cập nhật
       res.status(200).json({
-        message: "Thành viên đã được thêm vào nhóm thành công!",
+        message: "Các thành viên đã được thêm vào nhóm thành công!",
         chat: chat
       });
     } catch (error) {
@@ -71,6 +69,7 @@ router.post("/chatmemberBychatID&userID", async (req, res) => {
       res.status(500).json({ error: error.message });
     }
   });
+  
 
   router.post("/removeMemberFromGroup", async (req, res) => {
     try {
@@ -199,6 +198,31 @@ router.post("/deleteGroupAndMessages", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Router để gọi Controller.getMemberAddMember
+// Router để gọi Controller.getMemberAddMember
+router.post("/getMemberAddMember", async (req, res) => {
+  try {
+    const { chatID, userID } = req.body;
+
+    // Gọi Controller để lấy danh sách bạn bè chưa là thành viên nhóm
+    const friendsNotInGroup = await Controller.getMemberAddMember(chatID, userID);
+
+    if (friendsNotInGroup.error) {
+      return res.status(400).json({ message: friendsNotInGroup.error }); // Nếu có lỗi, trả về thông báo lỗi
+    }
+
+    // Nếu thành công, trả về danh sách bạn bè chưa là thành viên nhóm
+    return res.status(200).json({
+      message: "Lấy danh sách bạn bè thành công.",
+      friends: friendsNotInGroup,
+    });
+  } catch (error) {
+    console.error("Lỗi khi xử lý yêu cầu:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 
 
   

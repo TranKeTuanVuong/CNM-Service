@@ -4,6 +4,7 @@ const ChatMembers = require('../models/ChatMember');
 const messages = require('../models/Messages');
 const Users = require('../models/User');
 const Contacts = require("../models/Contacts");
+
 const Controller = {};
 
 Controller.getUserByID = async (userID) => {
@@ -664,7 +665,7 @@ Controller.createChatGroup = async (data)=>{
 
 };
 
-Controller.addMembersToGroup = async (chatID, memberID) => {
+Controller.addMembersToGroup = async (chatID, memberIDs) => {
   try {
     // Tìm chat theo chatID
     const memberChat = await ChatMembers.findOne({ chatID: chatID });
@@ -674,52 +675,46 @@ Controller.addMembersToGroup = async (chatID, memberID) => {
       return null; // Nếu không tìm thấy nhóm, trả về null
     }
 
-    // Kiểm tra xem memberID đã có trong mảng members hay chưa
-    const memberExists = memberChat.members.some(member => member.userID === memberID);
-
-    if (memberExists) {
-      console.log("Thành viên đã có trong nhóm.");
-      return { error: "Thành viên đã có trong nhóm." };
-    }
-
-    // Thêm memberID vào danh sách thành viên của chat, tránh trùng lặp
-    const chatMembers = await ChatMembers.updateOne(
-      { chatID: chatID },
-      { $addToSet: { members: { userID: memberID, role: "member" } } } // Thêm vào mảng members, tránh trùng lặp
+    // Lọc ra các memberID chưa có trong mảng members
+    const newMembers = memberIDs.filter(memberID => 
+      !memberChat.members.some(member => member.userID === memberID)
     );
 
-    if (chatMembers.modifiedCount === 0) {
-      console.log("Không có thành viên nào được thêm.");
+    if (newMembers.length === 0) {
+      console.log("Tất cả các thành viên đã có trong nhóm.");
+      return { error: "Tất cả các thành viên đã có trong nhóm." };
+    }
+
+    // Thêm các thành viên mới vào nhóm
+    await ChatMembers.updateOne(
+      { chatID: chatID },
+      { $addToSet: { members: { $each: newMembers.map(userID => ({ userID, role: "member" })) } } }
+    );
+
+    // Lấy lại thông tin nhóm sau khi thêm thành viên
+    const updatedChat = await ChatMembers.findOne({ chatID: chatID });
+
+    // Nếu không tìm thấy chat sau khi cập nhật
+    if (!updatedChat) {
+      console.log("Không tìm thấy nhóm sau khi thêm thành viên.");
       return null;
     }
 
-    // Lấy thông tin chat để đảm bảo rằng chatID tồn tại
+    // Lấy thông tin về nhóm
     const chat = await Chats.findOne({ chatID: chatID });
     if (!chat) {
-      console.log("Chat không tồn tại.");
+      console.log("Không tìm thấy thông tin chat.");
       return null;
     }
 
-    // Lấy lại thông tin các thành viên sau khi cập nhật
-    const newMember = await ChatMembers.findOne({ chatID: chatID });
-    if (!newMember) {
-      console.log("Không tìm thấy thành viên mới.");
-      return null;
-    }
-
-    // Lấy tất cả các tin nhắn của chat
+    // Lấy tất cả các tin nhắn của nhóm
     const lastMessage = await messages.find({ chatID: chatID }).lean();
 
-    // Kiểm tra nếu không có tin nhắn trong chat
-    if (lastMessage.length === 0) {
-      console.log("Không có tin nhắn nào trong chat.");
-    }
-
-    // Trả về thông tin chat, tin nhắn mới (nếu có) và danh sách thành viên
+    // Trả về thông tin nhóm, tin nhắn mới và thành viên
     return {
       ...chat.toObject(),
       lastMessage: lastMessage,
-      members: newMember.members
+      members: updatedChat.members
     };
   } catch (error) {
     console.error("Đã xảy ra lỗi:", error);
@@ -914,6 +909,53 @@ Controller.deleteGroupAndMessages = async (chatID) => {
   }
 };
 
+// Controller.getMemberAddMember
+// Controller.getMemberAddMember
+Controller.getMemberAddMember = async (chatID, userID) => {
+  try {
+    // Tìm nhóm (chat) theo chatID trong ChatMembers
+    const memberChat = await ChatMembers.findOne({ chatID: chatID });
+
+    if (!memberChat) {
+      console.log("Không tìm thấy nhóm.");
+      return { error: "Không tìm thấy nhóm." }; // Nếu không tìm thấy nhóm
+    }
+
+    // Lấy danh sách thành viên hiện tại của nhóm
+    const memberIDs = memberChat.members.map(member => member.userID);
+
+    // Lấy danh sách bạn bè của userID từ Contacts (trừ userID chính)
+    const userContacts = await Contacts.find({
+      $or: [
+        { userID: userID },   // Tìm các bản ghi có userID là userID của người dùng
+        { contactID: userID }  // Tìm các bản ghi có contactID là userID của người dùng
+      ]
+    });
+
+    if (!userContacts || userContacts.length === 0) {
+      return { error: "Không tìm thấy danh bạ bạn bè của người dùng." };
+    }
+
+    // Lọc bạn bè trong Contacts, trừ những người đã là thành viên của nhóm
+    const friendsNotInGroup = userContacts.filter(contact => {
+      const friendID = contact.userID === userID ? contact.contactID : contact.userID;
+      return !memberIDs.includes(friendID);
+    }).map(contact => {
+      // Trả về các thông tin bạn bè
+      return {
+        userID: contact.userID === userID ? contact.contactID : contact.userID,
+        alias: contact.alias,
+        status: contact.status
+      };
+    });
+
+    // Trả về danh sách bạn bè chưa phải thành viên của nhóm
+    return friendsNotInGroup;
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách bạn bè:", error);
+    return { error: error.message };
+  }
+};
 
 
 module.exports = Controller;
