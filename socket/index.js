@@ -356,6 +356,63 @@ socket.on("send_friend_request", async (data) => {
         console.error("❌ Error adding member:", error);
       }
     });
+
+    socket.on("removeMember", async (data) => {
+      const { chatID, memberID } = data;
+    
+      try {
+        // Gọi controller để xóa thành viên
+        const chat = await Controller.userRemoveFromGroup(chatID, memberID);
+        
+        // Kiểm tra xem nhóm có tồn tại hay không
+        if (!chat) {
+          console.error("❌ Không tìm thấy nhóm hoặc không thể xóa thành viên");
+          return;
+        }
+    
+        console.log("Thêm thành viên vào nhóm:", chat);
+        
+        // Kiểm tra xem members có tồn tại và có dữ liệu không
+        if (!chat.members || chat.members.length === 0) {
+          console.error("❌ Không có thành viên trong nhóm sau khi xóa.");
+          return;
+        }
+    
+        const newMembers = chat.members;
+        console.log("Thành viên mới sau khi xóa:", newMembers);
+    
+        // Lấy thông tin đầy đủ của các thành viên mới
+        const Informember = await Controller.getInforMember(newMembers);
+    
+        if (!Informember || Informember.length === 0) {
+          console.error("❌ Không thể lấy thông tin thành viên mới.");
+          return;
+        }
+    
+        console.log("Thông tin thành viên mới:", Informember);
+    
+        // Gửi socket event tới tất cả thành viên
+        newMembers.forEach((member) => {
+          const socketID = member.userID;
+    
+          if(socketID === memberID){
+            io.to(socketID).emit("removeChat", chatID); // Gửi thông báo xóa nhóm cho thành viên đã bị xóa
+            return; // Bỏ qua thành viên đã bị xóa
+          }
+    
+          // Gửi thông tin thành viên mới đến từng người
+          io.to(socketID).emit("outMember", Informember);
+      
+          // Gửi bản cập nhật nhóm mới (chat) đến từng người
+          io.to(socketID).emit("updateMemberChat", chat);
+        });
+    
+      } catch (error) {
+        console.error("Error removing member:", error);
+        socket.emit("removeMemberResponse", { success: false, message: "Lỗi khi xóa thành viên." });
+      }
+    });
+    
     
     // Ngắt kết nối
     socket.on("disconnect", () => {

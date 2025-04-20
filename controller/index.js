@@ -808,7 +808,7 @@ Controller.removeMemberFromGroup = async (chatID, adminID, memberID) => {
 
 Controller.userRemoveFromGroup = async (chatID, memberID) => {
   try {
-    // Tìm nhóm theo chatID
+    // Tìm chat theo chatID
     const memberChat = await ChatMembers.findOne({ chatID: chatID });
 
     if (!memberChat) {
@@ -830,13 +830,59 @@ Controller.userRemoveFromGroup = async (chatID, memberID) => {
     // Lưu thay đổi vào cơ sở dữ liệu
     await memberChat.save();
 
-    console.log("Thành viên đã rời nhóm.");
-    return memberChat; // Trả về thông tin nhóm sau khi đã xóa thành viên
+    // Lấy lại thông tin nhóm sau khi xóa thành viên
+    const updatedChat = await ChatMembers.findOne({ chatID: chatID });
+
+    if (!updatedChat) {
+      console.log("Không tìm thấy nhóm sau khi xóa thành viên.");
+      return { error: "Không tìm thấy nhóm sau khi xóa thành viên." };
+    }
+
+    // Lấy thông tin nhóm
+    const chat = await Chats.findOne({ chatID: chatID });
+    if (!chat) {
+      console.log("Không tìm thấy thông tin chat.");
+      return { error: "Không tìm thấy thông tin chat." };
+    }
+
+    let lastMessage = [];
+    // Lấy tất cả các tin nhắn của nhóm
+    const listmessages = await messages.find({ chatID: chatID }).lean();
+    if (listmessages.length === 0) {
+      console.log("Không có tin nhắn nào trong nhóm.");
+      lastMessage = [];
+    } else {
+      // 6. Nếu có tin nhắn, lấy thông tin sender
+      const senderIDs = listmessages.map(msg => msg.senderID);
+      const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
+
+      // 7. Gắn thông tin người gửi vào mỗi tin nhắn
+      const enrichedMessages = listmessages.map(msg => {
+        const sender = senders.find(u => u.userID === msg.senderID);
+        return {
+          ...msg,
+          senderInfo: sender ? {
+            name: sender.name,
+            avatar: sender.anhDaiDien || null,
+          } : null,
+        };
+      });
+      lastMessage = enrichedMessages;
+    }
+
+    // Trả về thông tin nhóm, tin nhắn mới và thành viên
+    return {
+      ...chat.toObject(),
+      lastMessage: lastMessage,
+      members: updatedChat.members
+    };
+
   } catch (error) {
-    console.error("Lỗi khi rời nhóm:", error);
+    console.error("Đã xảy ra lỗi khi xóa thành viên:", error);
     return { error: error.message };
   }
 };
+
 
 Controller.changeMemberRole = async (chatID, adminID, memberID, newRole) => {
   try {
