@@ -325,7 +325,38 @@ socket.on("send_friend_request", async (data) => {
         socket.emit("error", { message: "Lỗi khi lấy yêu cầu kết bạn" });
       }
     });
-
+    socket.on("AddMember", async (data) => {
+      try {
+        // Thêm thành viên vào nhóm
+        const chat = await Controller.addMembersToGroup(data.chatID, data.members);
+        
+        // Kiểm tra xem nhóm có tồn tại hay không
+        if (!chat) {
+          console.error("❌ Không tìm thấy nhóm hoặc không thể thêm thành viên");
+          return;
+        }
+     console.log("Thêm thành viên vào nhóm:", chat);
+        const newMembers = chat.members;
+    
+        // Lấy thông tin đầy đủ của các thành viên mới
+        const Informember = await Controller.getInforMember(newMembers);
+    
+        // Gửi socket event tới tất cả thành viên
+        newMembers.forEach((member) => {
+          const socketID = member.userID;
+    
+          // Gửi thông tin thành viên mới đến từng người
+          io.to(socketID).emit("newMember", Informember);
+    
+          // Gửi bản cập nhật nhóm mới (chat) đến từng người
+          io.to(socketID).emit("updateChat",chat);
+        });
+    
+      } catch (error) {
+        console.error("❌ Error adding member:", error);
+      }
+    });
+    
     // Ngắt kết nối
     socket.on("disconnect", () => {
       console.log("🔴 Client disconnected:", socket.id);

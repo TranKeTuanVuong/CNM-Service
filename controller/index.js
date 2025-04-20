@@ -688,7 +688,7 @@ Controller.getInforMember = async (members) => {
     return null;
   }
 };
-
+// them nhieu thanh vien vao nhom
 Controller.addMembersToGroup = async (chatID, memberIDs) => {
   try {
     // Tìm chat theo chatID
@@ -730,10 +730,30 @@ Controller.addMembersToGroup = async (chatID, memberIDs) => {
       console.log("Không tìm thấy thông tin chat.");
       return null;
     }
-
+   let lastMessage = [];
     // Lấy tất cả các tin nhắn của nhóm
-    const lastMessage = await messages.find({ chatID: chatID }).lean();
-
+    const listmessages = await messages.find({ chatID: chatID }).lean();
+    if (listmessages.length === 0) {
+      console.log("Không có tin nhắn nào trong nhóm.");
+      lastMessage = [];
+    }
+     // 6. Nếu có tin nhắn, lấy thông tin sender
+     const senderIDs = listmessages.map(msg => msg.senderID);
+     const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
+ 
+     // 7. Gắn thông tin người gửi vào mỗi tin nhắn
+     const enrichedMessages = listmessages.map(msg => {
+       const sender = senders.find(u => u.userID === msg.senderID);
+       return {
+         ...msg,
+         senderInfo: sender ? {
+           name: sender.name,
+           avatar: sender.anhDaiDien || null,
+         } : null,
+       };
+     });
+     lastMessage = enrichedMessages;
+    
     // Trả về thông tin nhóm, tin nhắn mới và thành viên
     return {
       ...chat.toObject(),
@@ -961,17 +981,25 @@ Controller.getMemberAddMember = async (chatID, userID) => {
     }
 
     // Lọc bạn bè trong Contacts, trừ những người đã là thành viên của nhóm
-    const friendsNotInGroup = userContacts.filter(contact => {
+    const friendsNotInGroup = await Promise.all(userContacts.filter(contact => {
       const friendID = contact.userID === userID ? contact.contactID : contact.userID;
       return !memberIDs.includes(friendID);
-    }).map(contact => {
-      // Trả về các thông tin bạn bè
+    }).map(async (contact) => {
+      const friendID = contact.userID === userID ? contact.contactID : contact.userID;
+
+      // Lấy thông tin chi tiết người bạn từ bảng Users
+      const friendInfo = await Users.findOne({ userID: friendID });
+
+      // Trả về các thông tin bạn bè, bao gồm ảnh đại diện và số điện thoại từ Users
       return {
-        userID: contact.userID === userID ? contact.contactID : contact.userID,
-        alias: contact.alias,
-        status: contact.status
+        userID: friendID,
+        status: contact.status,
+        avatar: friendInfo?.anhDaiDien, // Lấy avatar từ bảng Users
+        phone: friendInfo?.sdt,   // Lấy số điện thoại từ bảng Users
+        name: friendInfo?.name, // Lấy tên từ bảng Users
+
       };
-    });
+    }));
 
     // Trả về danh sách bạn bè chưa phải thành viên của nhóm
     return friendsNotInGroup;
@@ -980,6 +1008,7 @@ Controller.getMemberAddMember = async (chatID, userID) => {
     return { error: error.message };
   }
 };
+
 
 
 
