@@ -412,8 +412,115 @@ socket.on("send_friend_request", async (data) => {
         socket.emit("removeMemberResponse", { success: false, message: "Lỗi khi xóa thành viên." });
       }
     });
+    socket.on("updateAdmin", async (data) => {
+      try {
+        const { chatID, adminID, memberID } = data;
     
+        // Gọi controller để cập nhật admin
+        const chat = await Controller.transferRole(chatID, adminID, memberID);
     
+        // Kiểm tra lỗi từ controller
+        if (!chat || chat.error) {
+          console.error("❌ Không thể cập nhật quyền admin:", chat?.error || "Lỗi không xác định");
+          return;
+        }
+    
+        // Kiểm tra members tồn tại
+        if (!chat.members || chat.members.length === 0) {
+          console.error("❌ Không có thành viên trong nhóm sau khi chuyển quyền.");
+          return;
+        }
+    
+        const newMembers = chat.members;
+        console.log("✅ Thành viên mới sau khi chuyển quyền:", newMembers);
+    
+        // Lấy thông tin thành viên
+        const Informember = await Controller.getInforMember(newMembers);
+    
+        if (!Informember || Informember.length === 0) {
+          console.error("❌ Không thể lấy thông tin thành viên.");
+          return;
+        }
+    
+        console.log("✅ Thông tin thành viên mới:", Informember);
+    
+        // Gửi socket đến các thành viên
+        newMembers.forEach((member) => {
+          const socketID = member.userID;
+    
+          io.to(socketID).emit("UpdateRole", Informember);   // Gửi danh sách thành viên cập nhật
+          io.to(socketID).emit("updateChatt", chat);         // Gửi dữ liệu nhóm mới
+        });
+    
+      } catch (error) {
+        console.error("❌ Lỗi khi cập nhật admin:", error);
+      }
+    });
+
+    socket.on("deleteGroupAndMessages", async (data) => {
+      try{
+      const { chatID } = data;
+      const chatmember = await ChatMembers.findOne({ chatID });
+      if (!chatmember) {
+        console.error("❌ Không tìm thấy nhóm với chatID:", chatID);
+        return;
+      }
+      const result = await Controller.deleteGroupAndMessages(chatID);
+      if (!result) {
+        console.error("❌ Không thể xóa nhóm hoặc không tìm thấy nhóm với chatID:", chatID);
+        return;
+      }
+      chatmember.members.forEach((member) => {
+        const socketID = member.userID;
+        io.to(socketID).emit("removeChatt", chatID); // Gửi thông báo xóa nhóm cho tất cả thành viên
+      });
+    }catch (error) {
+      console.error("❌ Lỗi khi xóa nhóm và tin nhắn:", error);
+    }
+    });
+    socket.on("deleteMember", async (data) => {
+      try {
+        const {chatID,adminID, memberID} = data;
+        const chat = await Controller.removeMemberFromGroup(chatID, adminID, memberID);
+        if (!chat) {
+          console.error("❌ Không tìm thấy nhóm hoặc không thể xóa thành viên");
+          return;
+        }
+        const newMembers = chat.members;
+        console.log("Thành viên mới sau khi xóa:", newMembers);
+    
+        // Lấy thông tin đầy đủ của các thành viên mới
+        const Informember = await Controller.getInforMember(newMembers);
+    
+        if (!Informember || Informember.length === 0) {
+          console.error("❌ Không thể lấy thông tin thành viên mới.");
+          return;
+        }
+    
+        console.log("Thông tin thành viên mới:", Informember);
+    
+        // Gửi socket event tới tất cả thành viên
+        newMembers.forEach((member) => {
+          const socketID = member.userID;
+    
+          if(socketID === memberID){
+            io.to(socketID).emit("removeChatt", chatID); // Gửi thông báo xóa nhóm cho thành viên đã bị xóa
+            return; // Bỏ qua thành viên đã bị xóa
+          }
+    
+          // Gửi thông tin thành viên mới đến từng người
+          io.to(socketID).emit("outMemberr", Informember);
+      
+          // Gửi bản cập nhật nhóm mới (chat) đến từng người
+          io.to(socketID).emit("updateMemberChattt", chat);
+        });
+      
+      }
+      catch (error) {
+        console.error("❌ Lỗi khi xóa thành viên:", error);
+      }
+    });
+        
     // Ngắt kết nối
     socket.on("disconnect", () => {
       console.log("🔴 Client disconnected:", socket.id);

@@ -926,51 +926,91 @@ Controller.changeMemberRole = async (chatID, adminID, memberID, newRole) => {
 
 Controller.transferRole = async (chatID, adminID, memberID) => {
   try {
-    // Tìm nhóm (chat) theo chatID
+    // 1. Tìm nhóm (chat) theo chatID
     const memberChat = await ChatMembers.findOne({ chatID: chatID });
 
     if (!memberChat) {
       console.log("Không tìm thấy nhóm.");
-      return { error: "Không tìm thấy nhóm." }; // Nếu không tìm thấy nhóm
+      return { error: "Không tìm thấy nhóm." };
     }
 
-    // Kiểm tra nếu adminID có quyền 'admin' trong nhóm
+    // 2. Kiểm tra nếu adminID có quyền 'admin' trong nhóm
     const adminMember = memberChat.members.find(member => member.userID === adminID && member.role === 'admin');
-
     if (!adminMember) {
       console.log("Chỉ admin mới có quyền thay đổi quyền của thành viên.");
-      return { error: "Chỉ admin mới có quyền thay đổi quyền của thành viên." }; // Nếu không phải admin, trả về lỗi
+      return { error: "Chỉ admin mới có quyền thay đổi quyền của thành viên." };
     }
 
-    // Kiểm tra xem memberID có trong mảng members hay không
+    // 3. Kiểm tra xem memberID có trong nhóm
     const memberIndex = memberChat.members.findIndex(member => member.userID === memberID);
-
     if (memberIndex === -1) {
       console.log("Thành viên không tồn tại trong nhóm.");
-      return { error: "Thành viên không tồn tại trong nhóm." }; // Nếu không tìm thấy thành viên
+      return { error: "Thành viên không tồn tại trong nhóm." };
     }
 
-    // Kiểm tra quyền hiện tại của thành viên (đảm bảo là 'member')
+    // 4. Kiểm tra nếu thành viên đã là admin
     if (memberChat.members[memberIndex].role === 'admin') {
-      console.log("Không thể thay đổi quyền nếu thành viên là admin.");
-      return { error: "Không thể thay đổi quyền nếu thành viên là admin." }; // Không thể thay đổi nếu thành viên đã là admin
+      console.log("Thành viên đã là admin.");
+      return { error: "Thành viên đã là admin." };
     }
 
-    // Cập nhật quyền của thành viên và admin
-    // Thành viên trở thành admin, admin trở thành member
+    // 5. Chuyển quyền: member → admin, admin → member
     memberChat.members[memberIndex].role = 'admin';
     adminMember.role = 'member';
 
-    // Lưu thay đổi vào cơ sở dữ liệu
+    // 6. Lưu thay đổi vào DB
     await memberChat.save();
 
-    console.log(`Quyền của thành viên ${memberID} và admin ${adminID} đã được thay đổi.`);
-    return memberChat; // Trả về nhóm sau khi thay đổi quyền
+    // 7. Lấy lại dữ liệu cập nhật
+    const updatedChat = await ChatMembers.findOne({ chatID: chatID });
+
+    if (!updatedChat) {
+      console.log("Không tìm thấy nhóm sau khi chuyển quyền.");
+      return { error: "Không tìm thấy nhóm sau khi chuyển quyền." };
+    }
+
+    // 8. Lấy thông tin nhóm
+    const chat = await Chats.findOne({ chatID: chatID });
+    if (!chat) {
+      console.log("Không tìm thấy thông tin chat.");
+      return { error: "Không tìm thấy thông tin chat." };
+    }
+
+    // 9. Lấy tin nhắn
+    const listmessages = await messages.find({ chatID: chatID }).lean();
+
+    let lastMessage = [];
+    if (listmessages.length > 0) {
+      const senderIDs = listmessages.map(msg => msg.senderID);
+      const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
+
+      const enrichedMessages = listmessages.map(msg => {
+        const sender = senders.find(u => u.userID === msg.senderID);
+        return {
+          ...msg,
+          senderInfo: sender ? {
+            name: sender.name,
+            avatar: sender.anhDaiDien || null,
+          } : null,
+        };
+      });
+
+      lastMessage = enrichedMessages;
+    }
+
+    // 10. Trả về dữ liệu đồng bộ
+    return {
+      ...chat.toObject(),
+      lastMessage: lastMessage,
+      members: updatedChat.members
+    };
+
   } catch (error) {
-    console.error("Lỗi khi phân quyền:", error);
+    console.error("Lỗi khi chuyển quyền:", error);
     return { error: error.message };
   }
 };
+
 
 Controller.deleteGroupAndMessages = async (chatID) => {
   try {
@@ -992,10 +1032,10 @@ Controller.deleteGroupAndMessages = async (chatID) => {
     await messages.deleteMany({ chatID: chatID });
 
     console.log(`Nhóm ${chatID} đã được giải tán và xóa hoàn toàn.`);
-    return { message: `Nhóm ${chatID} đã được giải tán và xóa hoàn toàn.` };
+    return true;
   } catch (error) {
     console.error("Lỗi khi giải tán nhóm và xóa tin nhắn:", error);
-    return { error: error.message };
+    return false; // Trả về false nếu có lỗi xảy ra
   }
 };
 
