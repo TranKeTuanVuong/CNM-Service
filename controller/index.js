@@ -1095,9 +1095,99 @@ Controller.getMemberAddMember = async (chatID, userID) => {
   }
 };
 
+// Hàm kiểm tra tính hợp lệ của số điện thoại
+const isValidPhoneNumber = (phoneNumber) => {
+  const phoneRegex = /^(0[3|5|7|8|9][0-9]{8}|(\+84)[3|5|7|8|9][0-9]{8})$/;
+  return phoneRegex.test(phoneNumber);
+};
+
+// Hàm kiểm tra tính hợp lệ của email
+const isValidEmail = (email) => {
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return emailRegex.test(email);
+};
 
 
+// Hàm kiểm tra tính hợp lệ của ngày sinh và tuổi >= 18
+const isValidDOB = (dob) => {
+  const dobRegex = /^\d{4}-\d{2}-\d{2}$/;  // Kiểm tra định dạng yyyy-mm-dd
+  if (!dobRegex.test(dob)) return false;
 
+  // Kiểm tra tuổi >= 18
+  const birthDate = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+
+  // Nếu tháng hiện tại chưa đến sinh nhật của năm nay, giảm tuổi đi 1
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+
+  return age >= 18; // Kiểm tra tuổi >= 18
+};
+
+Controller.updateUserInfo = async (req, res) => {
+  try {
+    const { userID } = req.params;
+    const updateData = req.body;
+
+    // Ràng buộc định dạng số điện thoại
+    if (updateData.sdt && !isValidPhoneNumber(updateData.sdt)) {
+      return res.status(400).json({ error: "Invalid phone number format" });
+    }
+
+    // Ràng buộc định dạng email
+    if (updateData.email && !isValidEmail(updateData.email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    // Chuẩn hóa và kiểm tra ngày sinh
+    if (updateData.ngaysinh) {
+      const dobParts = updateData.ngaysinh.split("-");
+      if (dobParts.length === 3) {
+        const year = dobParts[0];
+        const month = dobParts[1].padStart(2, "0"); // Đảm bảo có 2 chữ số
+        const day = dobParts[2].padStart(2, "0");   // Đảm bảo có 2 chữ số
+        updateData.ngaysinh = `${year}-${month}-${day}`;
+      }
+
+      if (!isValidDOB(updateData.ngaysinh)) {
+        return res.status(400).json({ error: "Invalid date of birth or age must be at least 18" });
+      }
+    }
+
+    // Tìm người dùng
+    const user = await Users.findOne({ userID });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Cập nhật ngày sinh
+    if (updateData.ngaysinh) {
+      user.ngaysinh = new Date(updateData.ngaysinh);
+    }
+
+    // Các trường được phép cập nhật
+    const allowedFields = ["name", "email", "sdt", "ngaySuaDoi", "ngaysinh", "gioTinh", "anhDaiDien", "anhBia"];
+    allowedFields.forEach(field => {
+      if (updateData[field] !== undefined) {
+        user[field] = updateData[field];
+      }
+    });
+
+    // Cập nhật ngày sửa đổi
+    user.ngaySuaDoi = new Date();
+
+    // Lưu lại thay đổi
+    await user.save();
+
+    return res.status(200).json({ message: "User updated successfully", user });
+  } catch (error) {
+    console.error('Lỗi khi cập nhật thông tin người dùng:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
 
 
 

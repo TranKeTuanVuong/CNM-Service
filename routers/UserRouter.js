@@ -7,6 +7,8 @@ const Controller = require("../controller/index");
 const upload = require("../middleware/index");
 const uploadToCloudinary = require("../service/index");
 
+router.put("/users/:userID", Controller.updateUserInfo);
+
 // API lấy danh sách user
 router.get("/users", async (req, res) => {
   try {
