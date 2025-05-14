@@ -21,7 +21,11 @@ router.get("/users", async (req, res) => {
 router.post("/usersID", async (req, res) => {
   try {
     const { userID } = req.body;
-    const user = await Users.find({ userID: userID });
+    const user = await Users.findOne({ userID });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     res.json(user);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -88,6 +92,20 @@ const generateUserID = async () => {
   // Đảm bảo rằng userID có 3 chữ số
   return `user${newNumber.toString().padStart(3, '0')}`;
 };
+// update trang thai user
+router.post("/updateStatus", async (req, res) => {
+  const { userID, trangThai } = req.body;
+  try {
+    const user = await Controller.updateUserStatus(userID,trangThai);
+    if (!user) {
+      return res.status(404).json({ message: "Người dùng không tồn tại" });
+    }
+    res.status(200).json({ success: true, user });
+  }catch (error) {
+    console.error("Lỗi:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
 // API đăng ký người dùng
 router.post("/registerUser",async (req, res) => {
   const { sdt, name, ngaySinh, matKhau,email,gioTinh} = req.body;
@@ -95,13 +113,15 @@ router.post("/registerUser",async (req, res) => {
   if (!sdt || !name || !ngaySinh || !matKhau || !email) {
       return res.status(400).json({ message: "Vui lòng điền đầy đủ thông tin" });
   }
+  const [day, month, year] = ngaySinh.split('/');
+  const ngaySinhDate = new Date(`${year}-${month}-${day}`);
 
   // Kiểm tra xem người dùng đã tồn tại chưa
   const userExists = await Users.findOne({ sdt });
   if (userExists) {
       return res.status(400).json({ message: "Số điện thoại đã được đăng ký" });
   }
-
+ 
   // Mã hóa mật khẩu
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(matKhau, salt);
@@ -115,7 +135,7 @@ router.post("/registerUser",async (req, res) => {
       email: email, 
       anhDaiDien:"https://res.cloudinary.com/dgqppqcbd/image/upload/v1741595806/anh-dai-…",
       trangThai: "offline",
-      ngaysinh: ngaySinh,
+      ngaysinh: ngaySinhDate,
       anhBia:"https://res.cloudinary.com/dgqppqcbd/image/upload/v1741595806/anh-dai-…",
       gioTinh: gioTinh,
       sdt: sdt,

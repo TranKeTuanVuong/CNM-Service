@@ -29,6 +29,24 @@ const socketHandler = (io) => {
       socket.join(chatID);
       console.log(`🔁 Socket ${socket.id} joined chat room: ${chatID}`);
     });
+      // update trạng thái online/offline
+    socket.on("updateStatus", async (data) => {
+      try {
+        //const { user} = data;
+        const friends = await Controller.getContactsByUserID(data.userID);
+        if (!friends) {
+          console.error("❌ Không tìm thấy bạn bè với userID:", data.userID);
+          return;
+        }
+        friends.forEach((friend) => {
+          io.to(friend.userID).emit("status_update", data);
+        });
+        
+      } catch (error) {
+        console.error("❌ Error updating status:", error);
+      }
+    });
+
     // Tham gia phòng chat 1-1
     socket.on("createChat1-1", async (data) => {
       try {
@@ -82,8 +100,8 @@ const socketHandler = (io) => {
           timestamp: saved.timestamp,
           status: "sent",
           senderInfo: {
-            name: data.senderName || "Người dùng",
-            avatar: data.senderAvatar || null,
+            name: data.senderInfo.name || "Người dùng",
+            avatar: data.senderInfo.avatar || null,
           },
         };
 
@@ -390,15 +408,12 @@ socket.on("send_friend_request", async (data) => {
         }
     
         console.log("Thông tin thành viên mới:", Informember);
-    
+        io.to(memberID).emit("removeChatt", chatID); 
         // Gửi socket event tới tất cả thành viên
         newMembers.forEach((member) => {
           const socketID = member.userID;
     
-          if(socketID === memberID){
-            io.to(socketID).emit("removeChat", chatID); // Gửi thông báo xóa nhóm cho thành viên đã bị xóa
-            return; // Bỏ qua thành viên đã bị xóa
-          }
+         
     
           // Gửi thông tin thành viên mới đến từng người
           io.to(socketID).emit("outMember", Informember);
@@ -449,7 +464,7 @@ socket.on("send_friend_request", async (data) => {
           const socketID = member.userID;
     
           io.to(socketID).emit("UpdateRole", Informember);   // Gửi danh sách thành viên cập nhật
-          io.to(socketID).emit("updateChatt", chat);         // Gửi dữ liệu nhóm mới
+          io.to(socketID).emit("updateChatmember", chat);         // Gửi dữ liệu nhóm mới
         });
     
       } catch (error) {
@@ -498,15 +513,15 @@ socket.on("send_friend_request", async (data) => {
         }
     
         console.log("Thông tin thành viên mới:", Informember);
-    
+        
+          io.to(memberID).emit("removeChattt", chatID); // Gửi thông báo xóa nhóm cho thành viên đã bị xóa
+         // return; // Bỏ qua thành viên đã bị xóa
+        
         // Gửi socket event tới tất cả thành viên
         newMembers.forEach((member) => {
           const socketID = member.userID;
     
-          if(socketID === memberID){
-            io.to(socketID).emit("removeChatt", chatID); // Gửi thông báo xóa nhóm cho thành viên đã bị xóa
-            return; // Bỏ qua thành viên đã bị xóa
-          }
+          
     
           // Gửi thông tin thành viên mới đến từng người
           io.to(socketID).emit("outMemberr", Informember);

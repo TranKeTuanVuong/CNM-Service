@@ -125,6 +125,25 @@ Controller.getChatsForUser = async (userID) => {
   }
 };
 
+// update trạng thái của người dùng
+Controller.updateUserStatus = async (userID,trangThai) => {
+  try {
+    const user = await Users.findOneAndUpdate(
+      { userID: userID },
+      { $set: { trangThai: trangThai } },
+      { new: true, runValidators: true }
+    );
+    if (!user) {
+      console.error("Không tìm thấy người dùng với userID:", userID);
+      return null;
+    }
+    return user;
+  }catch (error) {
+    console.error("Lỗi:", error.message);
+    return null;
+  }
+};
+
 
 
 Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
