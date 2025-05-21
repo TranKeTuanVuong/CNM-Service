@@ -3,6 +3,7 @@ const ChatMembers = require("../models/ChatMember");
 const Controller = require("../controller/index");
 const Contacts = require("../models/Contacts");
 const Users = require("../models/User");
+const Chats = require("../models/Chat");
 
  
 
@@ -28,6 +29,22 @@ const socketHandler = (io) => {
     socket.on("join_chat", (chatID) => {
       socket.join(chatID);
       console.log(`🔁 Socket ${socket.id} joined chat room: ${chatID}`);
+    });
+    // update user
+    socket.on("updateUser",async (data) => {
+      try{
+        const friends = await Controller.getContactsByUserID(data.userID);
+        if (!friends) {
+          io.to(data.userID).emit("update_user", data);
+        } else{
+          io.to(data.userID).emit("update_user", data);
+        friends.forEach((friend) => {
+          io.to(friend.userID).emit("updatee_user", data);
+        });
+      }
+      }catch (error) {
+        console.error("❌ Error updating user:", error);
+      }
     });
       // update trạng thái online/offline
     socket.on("updateStatus", async (data) => {
@@ -66,67 +83,135 @@ const socketHandler = (io) => {
       }
     });
     
-
-    // Gửi tin nhắn mới
-    socket.on("send_message", async (data) => {
-      try {
-        const lastMessage = await messages.findOne().sort({ messageID: -1 });
-        const nextID = lastMessage
-          ? parseInt(lastMessage.messageID.replace("msg", "")) + 1
-          : 1;
-        const messageID = `msg${String(nextID).padStart(3, "0")}`;
-
-        const newMsg = new messages({
-          messageID,
-          chatID: data.chatID,
-          senderID: data.senderID,
-          content: data.content || "",
-          type: data.type || "text",
-          timestamp: data.timestamp || Date.now(),
-          media_url: data.media_url || [],
-          status: "sent",
-        });
-
-        const saved = await newMsg.save();
-
-        const chatMembers = await ChatMembers.find({ chatID: data.chatID });
-        const receiverIDs = chatMembers
-          .map((m) => m.userID)
-          .filter((id) => id !== data.senderID);
-
-        const fullMessage = {
-          ...data,
-          messageID: saved.messageID,
-          timestamp: saved.timestamp,
-          status: "sent",
-          senderInfo: {
-            name: data.senderInfo.name || "Người dùng",
-            avatar: data.senderInfo.avatar || null,
-          },
-        };
-
-        receiverIDs.forEach((userID) => {
-          io.to(userID).emit("new_message", fullMessage);
-        });
-
-        io.to(data.senderID).emit("new_message", fullMessage);
-        io.to(data.chatID).emit(data.chatID, fullMessage);
-
-        setTimeout(() => {
-          messages.findOneAndUpdate(
-            { messageID: saved.messageID },
-            { status: "delivered" }
-          ).exec();
-
-          io.to(data.chatID).emit(`status_update_${data.chatID}`, {
-            messageID: saved.messageID,
-            status: "delivered",
-          });
-        }, 1000);
-      } catch (error) {
-        console.error("❌ Error sending message:", error);
-      }
+    // tin nhắn mới
+   socket.on("send_message", async (data) => {
+  try {
+    const lastMessage = await messages.findOne().sort({ messageID: -1 });
+    const nextID = lastMessage
+      ? parseInt(lastMessage.messageID.replace("msg", ""), 10) + 1
+      : 1;
+    const messageID = `msg${String(nextID).padStart(3, "0")}`;
+    let newMsg;
+    if (data.replyTo){
+       newMsg = new messages({
+      messageID,
+      chatID: data.chatID,
+      senderID: data.senderID,
+      content: data.content || "",
+      type: data.type || "text",
+      timestamp: data.timestamp || Date.now(),
+      media_url: data.media_url || [],
+      status: "sent",
+      pinnedInfo: null,
+      replyTo: data.replyTo,
     });
+    }else{
+      newMsg = new messages({
+      messageID,
+      chatID: data.chatID,
+      senderID: data.senderID,
+      content: data.content || "",
+      type: data.type || "text",
+      timestamp: data.timestamp || Date.now(),
+      media_url: data.media_url || [],
+      status: "sent",
+      pinnedInfo: null,
+      replyTo: null,
+    });
+  }
+
+    const saved = await newMsg.save();
+
+    const chatMembers = await ChatMembers.findOne({ chatID: data.chatID });
+    const receiverIDs = chatMembers?.members
+      .map((m) => m.userID)
+      .filter((id) => id !== data.senderID);
+    console.log("receiverIDs", receiverIDs);
+    const fullMessage = {
+      ...data,
+      messageID: saved.messageID,
+      timestamp: saved.timestamp,
+      status: "sent",
+      senderInfo: {
+        name: data.senderInfo?.name || "Người dùng",
+        avatar: data.senderInfo?.avatar || null,
+      },
+    };
+
+    // Gửi tới người nhận và người gửi
+    receiverIDs.forEach((id) => io.to(id).emit("new_message", fullMessage));
+    io.to(data.senderID).emit("new_message", fullMessage);
+    io.to(data.chatID).emit(data.chatID, fullMessage);
+
+    // Cập nhật trạng thái "delivered"
+    setTimeout(async () => {
+      await messages.findOneAndUpdate(
+        { messageID: saved.messageID },
+        { status: "delivered" }
+      ).exec();
+
+      io.to(data.chatID).emit(`status_update_${data.chatID}`, {
+        messageID: saved.messageID,
+        status: "delivered",
+      });
+    }, 1000);
+  } catch (error) {
+    console.error("❌ Error sending message:", error);
+  }
+});
+
+    // socket.on("send_message", async (data) => {
+    //   const messcount = await messages.findOne().sort({ messageID: -1 });
+    //   const nextID = messcount
+    //   ? parseInt(messcount.messageID.replace("msg", ""), 10) + 1
+    //   : 1;
+    // const messageID = `msg${String(nextID).padStart(3, "0")}`;
+    //   const newMsg = new messages({
+    //   messageID,
+    //   chatID: data.chatID,
+    //   senderID: data.senderID,
+    //   content: data.content || "",
+    //   type: data.type || "text",
+    //   timestamp: data.timestamp || Date.now(),
+    //   media_url: data.media_url || [],
+    //   status: "sent",
+    //   pinnedInfo: null,
+    //   replyTo: null,
+    // });
+    // // Lưu message vào database
+    // const saved = await newMsg.save();
+    // if (!saved) {
+    //   console.error("❌ Không thể lưu tin nhắn vào cơ sở dữ liệu");
+    //   return;
+    // }
+    //   const lastMessage = await messages.findOne({ chatID: data.chatID }).sort({ timestamp: -1 });
+    //   if (!lastMessage) {
+    //     console.error("❌ Không tìm thấy tin nhắn nào trong cuộc trò chuyện");
+    //     return;
+    //   }
+    //   const chatMembers = await ChatMembers.find({ chatID: data.chatID });
+    //   if (!chatMembers || chatMembers.length === 0) {
+    //     console.error("❌ Không tìm thấy thành viên nào trong cuộc trò chuyện");
+    //     return;
+    //   }
+    //   const chat = await Chats.findOne({ chatID: data.chatID });
+    //   if (!chat) {
+    //     console.error("❌ Không tìm thấy cuộc trò chuyện với chatID:", data.chatID);
+    //     return;
+    //   }
+    //   const mychat = {
+    //     ...chat,
+    //     members: chatMembers,
+    //     lastMessage: lastMessage
+    //   }
+    //   const receiverIDs = chatMembers.map((m) => m.userID).filter((id) => id !== data.senderID);
+    //   io.to(data.chatID).emit(data.chatID, mychat);
+    //   receiverIDs.forEach((userID) => {
+    //    // io.to(userID).emit("new_message", mychat);
+    //     io.to(userID).emit("chat_update", mychat);
+    //   });
+    // });
+    
 
     // Cập nhật trạng thái đã đọc
     socket.on("read_messages", async ({ chatID, userID }) => {
@@ -221,7 +306,7 @@ socket.on("send_friend_request", async (data) => {
       try {
         const message = await messages.findOne({ messageID });
 
-        if (!message || message.senderID !== senderID) {
+        if (!message ) {
           console.warn("⚠️ Unauthorized unsend or not found");
           return;
         }
@@ -248,6 +333,113 @@ socket.on("send_friend_request", async (data) => {
         console.log("❌ Message unsent:", messageID);
       } catch (error) {
         console.error("❌ Error unsending message:", error);
+      }
+    });
+
+     // ✅ ghim tin nhắn
+    socket.on("ghim_message", async ({ messageID, chatID, senderID }) => {
+      try {
+        const message = await messages.findOne({ messageID });
+
+        if (!message ) {
+          console.warn("⚠️ Unauthorized ghim or not found");
+          return;
+        }
+
+       message.pinnedInfo = {
+         pinnedBy: senderID,
+         pinnedAt: Date.now(),
+       };
+       await message.save();
+
+        if (!message) {
+          console.error("❌ Message not found:", messageID);
+          return;
+        }
+
+        io.to(chatID).emit("ghim_notification", message);
+
+        const members = await ChatMembers.find({ chatID });
+        members.forEach((m) => {
+          m.members.forEach((member) => {
+            io.to(member.userID).emit("ghim_notification", message);
+          });
+        });
+
+        console.log("❌ Message unsent:", messageID);
+      } catch (error) {
+        console.error("❌ Error unsending message:", error);
+      }
+    });
+    // ✅ unghim tin nhắn
+    socket.on("unghim_message", async ({ messageID, chatID}) => {
+      try {
+        const message = await messages.findOne({ messageID });
+
+        if (!message) {
+          console.warn("⚠️ Unauthorized unghim or not found");
+          return;
+        }
+
+       message.pinnedInfo = null;
+       await message.save();
+
+        if (!message) {
+          console.error("❌ Message not found:", messageID);
+          return;
+        }
+
+        io.to(chatID).emit("unghim_notification", message);
+
+        const members = await ChatMembers.find({ chatID });
+        members.forEach((m) => {
+          m.members.forEach((member) => {
+            io.to(member.userID).emit("unghim_notification", message);
+          });
+        });
+
+        console.log("❌ Message unpinned:", messageID);
+      } catch (error) {
+        console.error("❌ Error unpinning message:", error);
+      }
+    });
+
+    // ✅ trả lời tin nhắn
+    socket.on("reply_message", async ({ messageID, chatID, senderID, content }) => {
+      try {
+        const message = await messages.findOne({ messageID });
+
+        if (!message || message.senderID !== senderID) {
+          console.warn("⚠️ Unauthorized reply or not found");
+          return;
+        }
+
+        message.replyTo = {
+          messageID: message.messageID,
+          senderID: message.senderID,
+          content: content,
+          type: message.type,
+          media_url: message.media_url,
+        };
+       await message.save();
+
+        if (!message) {
+          console.error("❌ Message not found:", messageID);
+          return;
+        }
+
+        io.to(chatID).emit("reply_notification", message);
+
+        const members = await ChatMembers.find({ chatID });
+        members.forEach((m) => {
+          m.members.forEach((member) => {
+            io.to(member.userID).emit("reply_notification", message);
+          });
+        });
+
+        console.log("❌ Message replied:", messageID);
+      } catch (error) {
+        console.error("❌ Error replying message:", error);
       }
     });
 
@@ -387,18 +579,13 @@ socket.on("send_friend_request", async (data) => {
           console.error("❌ Không tìm thấy nhóm hoặc không thể xóa thành viên");
           return;
         }
-    
-        console.log("Thêm thành viên vào nhóm:", chat);
-        
+        console.log("Xóa thành viên khỏi nhóm:", chat);
         // Kiểm tra xem members có tồn tại và có dữ liệu không
         if (!chat.members || chat.members.length === 0) {
           console.error("❌ Không có thành viên trong nhóm sau khi xóa.");
           return;
         }
-    
         const newMembers = chat.members;
-        console.log("Thành viên mới sau khi xóa:", newMembers);
-    
         // Lấy thông tin đầy đủ của các thành viên mới
         const Informember = await Controller.getInforMember(newMembers);
     
@@ -406,15 +593,10 @@ socket.on("send_friend_request", async (data) => {
           console.error("❌ Không thể lấy thông tin thành viên mới.");
           return;
         }
-    
-        console.log("Thông tin thành viên mới:", Informember);
         io.to(memberID).emit("removeChatt", chatID); 
         // Gửi socket event tới tất cả thành viên
         newMembers.forEach((member) => {
           const socketID = member.userID;
-    
-         
-    
           // Gửi thông tin thành viên mới đến từng người
           io.to(socketID).emit("outMember", Informember);
       
@@ -434,6 +616,7 @@ socket.on("send_friend_request", async (data) => {
         // Gọi controller để cập nhật admin
         const chat = await Controller.transferRole(chatID, adminID, memberID);
     
+        console.log("Cập nhật quyền admin:", chat);
         // Kiểm tra lỗi từ controller
         if (!chat || chat.error) {
           console.error("❌ Không thể cập nhật quyền admin:", chat?.error || "Lỗi không xác định");
@@ -501,28 +684,19 @@ socket.on("send_friend_request", async (data) => {
           console.error("❌ Không tìm thấy nhóm hoặc không thể xóa thành viên");
           return;
         }
+        console.log("Xóa thành viên khỏi nhóm:", chat);
         const newMembers = chat.members;
-        console.log("Thành viên mới sau khi xóa:", newMembers);
-    
         // Lấy thông tin đầy đủ của các thành viên mới
         const Informember = await Controller.getInforMember(newMembers);
-    
         if (!Informember || Informember.length === 0) {
           console.error("❌ Không thể lấy thông tin thành viên mới.");
           return;
         }
-    
-        console.log("Thông tin thành viên mới:", Informember);
-        
           io.to(memberID).emit("removeChattt", chatID); // Gửi thông báo xóa nhóm cho thành viên đã bị xóa
          // return; // Bỏ qua thành viên đã bị xóa
-        
         // Gửi socket event tới tất cả thành viên
         newMembers.forEach((member) => {
           const socketID = member.userID;
-    
-          
-    
           // Gửi thông tin thành viên mới đến từng người
           io.to(socketID).emit("outMemberr", Informember);
       

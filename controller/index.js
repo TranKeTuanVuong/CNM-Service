@@ -335,13 +335,17 @@ Controller.createChat = async (userID1, userID2) => {
       const newNumber = lastNumber + 1;
       chatID = `chat${newNumber.toString().padStart(3, '0')}`;
     }
-
+    const user1 = await Users.findOne({ userID: userID1 });
     const user2 = await Users.findOne({ userID: userID2 });
-
+    const parts1 = user1.name.trim().split(" ");
+    const lastName1 = parts1[parts1.length - 1];
+    const parts2 = user2.name.trim().split(" ");
+    const lastName2 = parts2[parts2.length - 1];
     const newChat = new Chats({
       chatID: chatID,
       type: 'private',
-      name: user2.name, // Hoặc `${user1.name} & ${user2.name}` nếu cần
+      avatar:user2.anhDaiDien,
+      name: `${lastName1} & ${lastName2}`, // Hoặc `${user1.name} & ${user2.name}` nếu cần
       created_at: Date.now(),
     });
 
@@ -642,7 +646,7 @@ Controller.createChatGroup = async (data)=>{
     const newGroupChat = new Chats({
       chatID: chatID,
       type: 'group',
-      avatar: "https://res.cloudinary.com/dgqppqcbd/image/upload/v1741595806/anh-dai-dien-hai-2_isr0gd.jpg",
+      avatar: data.avatar,
       name: data.name,
       created_at: Date.now(),
     });
@@ -666,17 +670,45 @@ Controller.createChatGroup = async (data)=>{
     await groupMember.save();
 
     if (!groupMember) return null;
+    const userAdmin = await Users.findOne({ userID: data.adminID });
+    const userMember = await Promise.all(
+      data.members.map((member) => Users.findOne({ userID: member.userID }))
+    );
+
+    let thanhvien = '';
+      userMember.forEach((member) => {
+        thanhvien += `${member.name}, `;
+      });
+
+
+    const content = `${thanhvien}đã được ${userAdmin.name} thêm vào nhóm.`;
+
+     const messageForMember = new messages({
+          messageID: `msg${Date.now()}`, // Tạo ID tin nhắn mới
+          chatID: chatID,
+          senderID: data.adminID,
+          content: content,
+          type: 'notification',
+          timestamp: Date.now(),
+          status: 'sent',
+        });
+
+        await messageForMember.save();
+        let lastMessage = [];
+
+    // Lấy tất cả các tin nhắn của nhóm
+    lastMessage = await messages.find({ chatID: chatID }).lean();
 
     // ✅ Lấy lại chat + members để trả về
     const createdGroupChat = await Chats.findOne({ chatID }).lean();
     
     return {
       ...createdGroupChat,
-      lastMessage: [],
+      lastMessage: lastMessage.length > 0 ? lastMessage : [messageForMember],
       members: members
     };
 
-  }catch (error) {
+  } catch (error) {
     console.error("Lỗi khi tạo nhóm:", error);
     return null;
   }
@@ -818,7 +850,41 @@ Controller.removeMemberFromGroup = async (chatID, adminID, memberID) => {
     await memberChat.save();
 
     console.log("Thành viên đã được xóa khỏi nhóm.");
-    return memberChat; // Trả về nhóm sau khi xóa thành viên
+    const chat = await Chats.findOne({ chatID: chatID });
+    if (!chat) {
+      console.log("Không tìm thấy thông tin chat.");
+      return { error: "Không tìm thấy thông tin chat." };
+    }
+    let lastMessage = [];
+    // Lấy tất cả các tin nhắn của nhóm
+    const listmessages = await messages.find({ chatID: chatID }).lean();
+    if (listmessages.length === 0) {
+      console.log("Không có tin nhắn nào trong nhóm.");
+      lastMessage = [];
+    } else{
+      // 6. Nếu có tin nhắn, lấy thông tin sender
+      const senderIDs = listmessages.map(msg => msg.senderID);
+      const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
+
+      // 7. Gắn thông tin người gửi vào mỗi tin nhắn
+      const enrichedMessages = listmessages.map(msg => {
+        const sender = senders.find(u => u.userID === msg.senderID);
+        return {
+          ...msg,
+          senderInfo: sender ? {
+            name: sender.name,
+            avatar: sender.anhDaiDien || null,
+          } : null,
+        };
+      });
+      lastMessage = enrichedMessages;
+    }
+    const updatedChat = await ChatMembers.findOne({ chatID: chatID });
+    if (!updatedChat) {
+      console.log("Không tìm thấy nhóm sau khi xóa thành viên.");
+      return { error: "Không tìm thấy nhóm sau khi xóa thành viên." };
+    }
+    return { ...chat.toObject(), lastMessage, members: updatedChat.members }; // Trả về nhóm sau khi xóa thành viên
   } catch (error) {
     console.error("Lỗi khi xóa thành viên:", error);
     return { error: error.message };

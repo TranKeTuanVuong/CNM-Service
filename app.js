@@ -34,7 +34,7 @@ const server = http.createServer(app);
 // Khởi tạo Socket.io với HTTP server và cấu hình CORS
 const io = socketIo(server, {
   cors: {
-    origin: "*", // Cho phép frontend kết nối tới Socket.io từ port 5174
+    origin: 'http://localhost:5173', // Cho phép frontend kết nối tới Socket.io từ port 5174
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type", "Authorization"],
   },

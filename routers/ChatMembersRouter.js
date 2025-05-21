@@ -112,6 +112,7 @@ router.post("/chatmemberBychatID&userID", async (req, res) => {
 
   router.post("/leaveGroup", async (req, res) => {
   try {
+    console.log("Yêu cầu rời nhóm", req.body);
     const { chatID, memberID } = req.body; // Nhận chatID và memberID từ body
 
     console.log(`Thành viên ${memberID} muốn rời nhóm ${chatID}`);
