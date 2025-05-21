@@ -4,6 +4,7 @@ const ChatMembers = require('../models/ChatMember');
 const messages = require('../models/Messages');
 const Users = require('../models/User');
 const Contacts = require("../models/Contacts");
+const { pipeline } = require('nodemailer/lib/xoauth2');
 
 const Controller = {};
 
@@ -691,6 +692,7 @@ Controller.createChatGroup = async (data)=>{
           type: 'notification',
           timestamp: Date.now(),
           status: 'sent',
+          pinnedInfo: null
         });
 
         await messageForMember.save();
