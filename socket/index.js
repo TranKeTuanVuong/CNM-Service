@@ -496,7 +496,7 @@ socket.on("send_friend_request", async (data) => {
       }
   
       // 3. Emit tới người gửi
-      io.to(recipientID).emit("friend_request_rejected", {
+      io.to(recipientID).emit("friend_request_recipientID", {
         userID: senderID,
         name: senderName,
         avatar: senderImage, // Ensuring consistency with your code
@@ -504,7 +504,7 @@ socket.on("send_friend_request", async (data) => {
       });
   
       // 4. Emit tới người nhận
-      io.to(senderID).emit("friend_request_rejected", {
+      io.to(senderID).emit("friend_request_senderID", {
         recipientID,
         status: "rejected",
       });
