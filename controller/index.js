@@ -147,74 +147,157 @@ Controller.updateUserStatus = async (userID,trangThai) => {
 
 
 
+// Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
+//   try {
+//     // 1. Lấy danh sách chatID mà người dùng đăng nhập tham gia
+//     const memberDocs = await ChatMembers.find({ "members.userID": loggedInUserID }).lean();
+//     const chatIDs = memberDocs.map(m => m.chatID);
+
+//     // 2. Tìm tất cả các chat private trong danh sách chatIDs
+//     const privateChats = await Chats.find({
+//       chatID: { $in: chatIDs },
+//       type: 'private'
+//     }).lean();
+//     const listChatIDs = privateChats.map(chat => chat.chatID);
+//    const chatmembers = await ChatMembers.find({ chatID: { $in: listChatIDs } }).lean();
+//     let targetChat = null;
+
+//     // 3. Duyệt qua từng chat để tìm chat chứa cả 2 người
+//     for (const chat of chatmembers) {
+//       const members = chat.members; // Các thành viên của chat
+//       const hasUser1 = members.some(m => m.userID === loggedInUserID);
+//       const hasUser2 = members.some(m => m.userID === friendUserID);
+      
+//       // Nếu chat chứa cả hai người dùng, lưu lại chat đó
+//       if (hasUser1 && hasUser2) {
+//         targetChat = chat;
+//         break;
+//       }
+//     }
+
+//     // 4. Nếu không tìm thấy chat, return null
+//     if (!targetChat) {
+//       console.log("Chưa có chat 1-1 giữa hai người.");
+//       return null;
+//     }
+
+//     // 5. Lấy toàn bộ tin nhắn trong chat
+//     const messagesList = await messages.find({ chatID: targetChat.chatID }).sort({ timestamp: 1 }).lean();
+
+//     // Nếu không có tin nhắn nào, vẫn trả về chat với lastMessage là []
+//     if (messagesList.length === 0) {
+//       targetChat.lastMessage = [];
+//       return targetChat;
+//     }
+
+//     // 6. Nếu có tin nhắn, lấy thông tin sender
+//     const senderIDs = messagesList.map(msg => msg.senderID);
+//     const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
+
+//     // 7. Gắn thông tin người gửi vào mỗi tin nhắn
+//     const enrichedMessages = messagesList.map(msg => {
+//       const sender = senders.find(u => u.userID === msg.senderID);
+//       return {
+//         ...msg,
+//         senderInfo: sender ? {
+//           name: sender.name,
+//           avatar: sender.anhDaiDien || null,
+//         } : null,
+//       };
+//     });
+
+//     // 8. Gán tin nhắn cuối cùng vào chat
+//     targetChat.lastMessage = enrichedMessages;
+//     return targetChat;
+
+//   } catch (error) {
+//     console.error("Lỗi khi lấy chat 1-1:", error);
+//     throw error;
+//   }
+// };
+
 Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
   try {
-    // 1. Lấy danh sách chatID mà người dùng đăng nhập tham gia
-    const memberDocs = await ChatMembers.find({ "members.userID": loggedInUserID }).lean();
-    const chatIDs = memberDocs.map(m => m.chatID);
+    // 1. Tìm chat 1-1 giữa 2 người
+    const matchedChats = await ChatMembers.aggregate([
+      {
+        $match: {
+          "members.userID": { $all: [loggedInUserID, friendUserID] },
+        },
+      },
+      {
+        $addFields: {
+          memberCount: { $size: "$members" },
+        },
+      },
+      {
+        $match: {
+          memberCount: 2,
+        },
+      },
+      {
+        $lookup: {
+          from: "Chats",
+          localField: "chatID",
+          foreignField: "chatID",
+          as: "chat",
+        },
+      },
+      { $unwind: "$chat" },
+      {
+        $match: {
+          "chat.type": "private",
+        },
+      },
+    ]);
 
-    // 2. Tìm tất cả các chat private trong danh sách chatIDs
-    const privateChats = await Chats.find({
-      chatID: { $in: chatIDs },
-      type: 'private'
-    }).lean();
-    const listChatIDs = privateChats.map(chat => chat.chatID);
-   const chatmembers = await ChatMembers.find({ chatID: { $in: listChatIDs } }).lean();
-    let targetChat = null;
-
-    // 3. Duyệt qua từng chat để tìm chat chứa cả 2 người
-    for (const chat of chatmembers) {
-      const members = chat.members; // Các thành viên của chat
-      const hasUser1 = members.some(m => m.userID === loggedInUserID);
-      const hasUser2 = members.some(m => m.userID === friendUserID);
-      
-      // Nếu chat chứa cả hai người dùng, lưu lại chat đó
-      if (hasUser1 && hasUser2) {
-        targetChat = chat;
-        break;
-      }
-    }
-
-    // 4. Nếu không tìm thấy chat, return null
-    if (!targetChat) {
+    if (!matchedChats.length) {
       console.log("Chưa có chat 1-1 giữa hai người.");
       return null;
     }
 
-    // 5. Lấy toàn bộ tin nhắn trong chat
-    const messagesList = await messages.find({ chatID: targetChat.chatID }).sort({ timestamp: 1 }).lean();
+    const chatMemberDoc = matchedChats[0];
+    const chatInfo = chatMemberDoc.chat;
+    const members = chatMemberDoc.members.map(m => ({
+      userID: m.userID,
+      role: m.role,
+    }));
 
-    // Nếu không có tin nhắn nào, vẫn trả về chat với lastMessage là []
-    if (messagesList.length === 0) {
-      targetChat.lastMessage = [];
-      return targetChat;
+    // 2. Lấy danh sách tin nhắn
+    const messagesList = await messages.find({ chatID: chatInfo.chatID }).sort({ timestamp: 1 }).lean();
+
+    // 3. Gắn thông tin người gửi
+    let enrichedMessages = [];
+    if (messagesList.length > 0) {
+      const senderIDs = [...new Set(messagesList.map(msg => msg.senderID))];
+      const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
+
+      enrichedMessages = messagesList.map(msg => {
+        const sender = senders.find(u => u.userID === msg.senderID);
+        return {
+          ...msg,
+          senderInfo: sender
+            ? {
+                name: sender.name,
+                avatar: sender.anhDaiDien || null,
+              }
+            : null,
+        };
+      });
     }
 
-    // 6. Nếu có tin nhắn, lấy thông tin sender
-    const senderIDs = messagesList.map(msg => msg.senderID);
-    const senders = await Users.find({ userID: { $in: senderIDs } }).lean();
-
-    // 7. Gắn thông tin người gửi vào mỗi tin nhắn
-    const enrichedMessages = messagesList.map(msg => {
-      const sender = senders.find(u => u.userID === msg.senderID);
-      return {
-        ...msg,
-        senderInfo: sender ? {
-          name: sender.name,
-          avatar: sender.anhDaiDien || null,
-        } : null,
-      };
-    });
-
-    // 8. Gán tin nhắn cuối cùng vào chat
-    targetChat.lastMessage = enrichedMessages;
-    return targetChat;
-
+    // 4. Trả về đầy đủ thông tin
+    return {
+      chatInfo,
+      members,         // Chỉ gồm userID và role
+      lastMessage: enrichedMessages,
+    };
   } catch (error) {
     console.error("Lỗi khi lấy chat 1-1:", error);
     throw error;
   }
 };
+
 
 
 Controller.getCreatMessageByChatID = async (newMsg)=>{
