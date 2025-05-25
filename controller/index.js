@@ -218,55 +218,36 @@ Controller.updateUserStatus = async (userID,trangThai) => {
 
 Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
   try {
-    // 1. Tìm chat 1-1 giữa 2 người
-    const matchedChats = await ChatMembers.aggregate([
-      {
-        $match: {
-          "members.userID": { $all: [loggedInUserID, friendUserID] },
-        },
-      },
-      {
-        $addFields: {
-          memberCount: { $size: "$members" },
-        },
-      },
-      {
-        $match: {
-          memberCount: 2,
-        },
-      },
-      {
-        $lookup: {
-          from: "Chats",
-          localField: "chatID",
-          foreignField: "chatID",
-          as: "chat",
-        },
-      },
-      { $unwind: "$chat" },
-      {
-        $match: {
-          "chat.type": "private",
-        },
-      },
-    ]);
+    // 1. Tìm các ChatMembers chứa cả 2 người
+    const matchedChats = await ChatMembers.find({
+      "members.userID": { $all: [loggedInUserID, friendUserID] },
+    }).lean();
 
     if (!matchedChats.length) {
       console.log("Chưa có chat 1-1 giữa hai người.");
       return null;
     }
 
-    const chatMemberDoc = matchedChats[0];
-    const chatInfo = chatMemberDoc.chat;
-    const members = chatMemberDoc.members.map(m => ({
-      userID: m.userID,
-      role: m.role,
-    }));
+    // 2. Lọc ra chat có type = 'private'
+    const chatIDs = matchedChats.map(m => m.chatID);
+    const privateChat = await Chats.findOne({ chatID: { $in: chatIDs }, type: "private" }).lean();
 
-    // 2. Lấy danh sách tin nhắn
-    const messagesList = await messages.find({ chatID: chatInfo.chatID }).sort({ timestamp: 1 }).lean();
+    if (!privateChat) {
+      console.log("Không tìm thấy chat 1-1 giữa hai người.");
+      return null;
+    }
 
-    // 3. Gắn thông tin người gửi
+    // 3. Lấy thông tin thành viên của chat này
+    const memberDoc = await ChatMembers.findOne({ chatID: privateChat.chatID }).lean();
+    if (!memberDoc) {
+      console.log("Không tìm thấy thành viên chat.");
+      return null;
+    }
+
+    // 4. Lấy danh sách tin nhắn trong chat
+    const messagesList = await messages.find({ chatID: privateChat.chatID }).sort({ timestamp: 1 }).lean();
+
+    // 5. Gắn thông tin người gửi nếu có tin nhắn
     let enrichedMessages = [];
     if (messagesList.length > 0) {
       const senderIDs = [...new Set(messagesList.map(msg => msg.senderID))];
@@ -286,10 +267,13 @@ Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
       });
     }
 
-    // 4. Trả về đầy đủ thông tin
+    // 6. Trả về kết quả
     return {
-      chatInfo,
-      members,         // Chỉ gồm userID và role
+      ...privateChat,
+      members: memberDoc.members.map(m => ({
+        userID: m.userID,
+        role: m.role,
+      })),
       lastMessage: enrichedMessages,
     };
   } catch (error) {
@@ -297,6 +281,7 @@ Controller.getOneOnOneChat = async (loggedInUserID, friendUserID) => {
     throw error;
   }
 };
+
 
 
 
