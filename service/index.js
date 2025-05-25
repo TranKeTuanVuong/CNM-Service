@@ -65,15 +65,15 @@ async function uploadToCloudinary(file) {
   } else {
     throw new Error(`${file.originalname} is not a supported file format`);
   }
-
-  const publicId = `${fileType}_${randomString()}_${Date.now()}`;
+   const ext = file.originalname.split('.').pop();
+  const publicId = `${fileType}_${randomString()}_${Date.now()}.${ext}`;
 
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: getUploadFolder(fileType),
         public_id: publicId,
-        resource_type: "auto",
+        resource_type: getResourceType(fileType),
       },
       (error, result) => {
         if (error) {
@@ -86,6 +86,12 @@ async function uploadToCloudinary(file) {
 
     bufferToStream(file.buffer).pipe(uploadStream);
   });
+}
+function getResourceType(fileType) {
+  if (["image", "video", "audio"].includes(fileType)) {
+    return fileType; // image, video, audio
+  }
+  return "raw"; // tất cả định dạng khác
 }
 
 // Folder mapping helper
