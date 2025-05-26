@@ -260,6 +260,7 @@ socket.on("send_friend_request", async (data) => {
     return;
   }
   const User = await Users.findOne({ userID: data.senderID });
+  const userRecipient = await Users.findOne({ userID: data.recipientID });
   if (!User) {
     console.error("Failed to find user for senderID:", data.senderID);
     return;
@@ -268,10 +269,10 @@ socket.on("send_friend_request", async (data) => {
     alias:newContact.alias,
     contactID: newContact.contactID,
     userID: data.recipientID,
-    name: userRecipient.name,
-    avatar: userRecipient.anhDaiDien,
+    name: User.name,
+    avatar: User.anhDaiDien,
   }); // Gửi yêu cầu kết bạn đến người nhận
-  const userRecipient = await Users.findOne({ userID: data.recipientID });
+  
   if (!userRecipient) {
     console.error("Failed to find user for recipientID:", data.recipientID);
     return;
