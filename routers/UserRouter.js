@@ -206,6 +206,21 @@ router.post("/users/email", async (req, res) => {
   }
 });
 
+router.post("/users/Account", async (req, res) => {
+  try {
+    const { email,sdt } = req.body;
+    console.log("Email:", email); // Log email nhận được
+    console.log("Sdt:", sdt); // Log sdt nhận được
+
+    const userExists = await Users.exists({ email: email, sdt: sdt }); // Kiểm tra sự tồn tại
+
+    res.json({ exists: !!userExists }); // Trả về true nếu tồn tại, false nếu không
+  } catch (error) {
+    console.error("Lỗi:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/send-otp', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: 'Thiếu địa chỉ email' });
