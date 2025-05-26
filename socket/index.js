@@ -265,9 +265,11 @@ socket.on("send_friend_request", async (data) => {
     return;
   }
   io.to(data.recipientID).emit("new_friend_request", {
-    ContactID: data.senderID,
-    name:User.name,
-    avatar:User.anhDaiDien
+    alias:newContact.alias,
+    contactID: newContact.contactID,
+    userID: data.recipientID,
+    name: userRecipient.name,
+    avatar: userRecipient.anhDaiDien,
   }); // Gửi yêu cầu kết bạn đến người nhận
   const userRecipient = await Users.findOne({ userID: data.recipientID });
   if (!userRecipient) {
@@ -275,6 +277,8 @@ socket.on("send_friend_request", async (data) => {
     return;
   }
   io.to(data.senderID).emit('friend_request_sent', {
+    alias:newContact.alias,
+    contactID: newContact.contactID,
     userID: data.recipientID,
     name: userRecipient.name,
     avatar: userRecipient.anhDaiDien,
