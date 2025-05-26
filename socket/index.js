@@ -709,6 +709,26 @@ socket.on("send_friend_request", async (data) => {
         console.error("❌ Lỗi khi xóa thành viên:", error);
       }
     });
+     socket.on("call-user", (data) => {
+    io.to(data.to).emit("call-made", {
+      offer: data.offer,
+      from: socket.id,
+    });
+  });
+
+  socket.on("make-answer", (data) => {
+    io.to(data.to).emit("answer-made", {
+      answer: data.answer,
+      from: socket.id,
+    });
+  });
+
+  socket.on("ice-candidate", (data) => {
+    io.to(data.to).emit("ice-candidate", {
+      candidate: data.candidate,
+      from: socket.id,
+    });
+  });
         
     // Ngắt kết nối
     socket.on("disconnect", () => {
